@@ -1,0 +1,335 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  GUEST
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  PENDING_VERIFICATION
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
+enum RatingType {
+  POSITIVE
+  NEGATIVE
+}
+
+enum FlagType {
+  INAPPROPRIATE_CONTENT
+  SPAM
+  INCORRECT_ANSWER
+  TECHNICAL_ERROR
+  OTHER
+}
+
+enum FlagStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketType {
+  BUG
+  FEATURE_REQUEST
+  CRAWLING_ERROR
+  LLM_ERROR
+  OTHER
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SourceType {
+  ELAB_MAIN      // elab.fon.bg.ac.rs
+  ELAB_BC        // bc.elab.fon.bg.ac.rs
+  ELAB_EBT       // ebt.rs
+}
+
+enum SourceStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+}
+
+enum CrawlFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  MANUAL
+}
+
+enum CrawlJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  passwordHash      String
+  role              UserRole  @default(USER)
+  verified          Boolean   @default(false)
+  status            UserStatus @default(PENDING_VERIFICATION)
+  
+  // Email verification
+  verificationToken String?
+  tokenExpiresAt    DateTime?
+  
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastLogin         DateTime?
+  
+  // Relations
+  conversations     Conversation[]
+  ratings           Rating[]
+  auditLogs         AuditLog[]
+  
+  // Moderator relations
+  createdFAQs       FAQEntry[]    @relation("FAQCreator")
+  updatedFAQs       FAQEntry[]    @relation("FAQUpdater")
+  flagsCreated      Flag[]        @relation("FlagCreator")
+  flagsResolved     Flag[]        @relation("FlagResolver")
+  
+  // Admin relations
+  createdSources    Source[]      @relation("SourceCreator")
+  createdTickets    Ticket[]      @relation("TicketCreator")
+  assignedTickets   Ticket[]      @relation("TicketAssignee")
+  
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model Conversation {
+  id        String    @id @default(uuid())
+  userId    String
+  title     String    @default("Nova konverzacija")
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  flags     Flag[]
+  
+  @@index([userId])
+  @@index([createdAt])
+  @@map("conversations")
+}
+
+model Message {
+  id              String      @id @default(uuid())
+  conversationId  String
+  role            MessageRole
+  content         String      @db.Text
+  sources         Json?       // Array of {url, title, relevanceScore}
+  processingTime  Int?        // milliseconds
+  
+  createdAt       DateTime    @default(now())
+  
+  // Relations
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  ratings         Rating[]
+  flags           Flag[]
+  
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+model Rating {
+  id           String     @id @default(uuid())
+  messageId    String
+  userId       String?    // Null for guest ratings
+  rating       RatingType
+  feedbackText String?    @db.Text
+  
+  createdAt    DateTime   @default(now())
+  
+  // Relations
+  message      Message    @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@unique([messageId, userId]) // Jedan korisnik može oceniti poruku samo jednom
+  @@index([messageId])
+  @@map("ratings")
+}
+
+model Flag {
+  id              String      @id @default(uuid())
+  messageId       String?
+  conversationId  String?
+  flaggedBy       String
+  flagType        FlagType
+  description     String?     @db.Text
+  priority        Priority    @default(MEDIUM)
+  status          FlagStatus  @default(PENDING)
+  
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  
+  createdAt       DateTime    @default(now())
+  
+  // Relations
+  message         Message?       @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  conversation    Conversation?  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  flaggedByUser   User           @relation("FlagCreator", fields: [flaggedBy], references: [id], onDelete: Cascade)
+  resolvedByUser  User?          @relation("FlagResolver", fields: [resolvedBy], references: [id], onDelete: SetNull)
+  
+  @@index([flaggedBy])
+  @@index([status])
+  @@map("flags")
+}
+
+model FAQEntry {
+  id         String   @id @default(uuid())
+  question   String   @db.Text
+  answer     String   @db.Text
+  category   String   @default("Opšte")
+  
+  createdBy  String
+  updatedBy  String?
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  // Relations
+  creator    User     @relation("FAQCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  updater    User?    @relation("FAQUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+  
+  @@index([category])
+  @@map("faq_entries")
+}
+
+model Source {
+  id              String          @id @default(uuid())
+  url             String          @unique
+  sourceType      SourceType
+  priority        Priority        @default(MEDIUM)
+  status          SourceStatus    @default(ACTIVE)
+  crawlFrequency  CrawlFrequency  @default(WEEKLY)
+  
+  lastCrawledAt   DateTime?
+  lastError       String?         @db.Text
+  
+  createdAt       DateTime        @default(now())
+  createdBy       String
+  
+  // Relations
+  creator         User            @relation("SourceCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  crawlJobs       CrawlJob[]
+  
+  @@index([sourceType])
+  @@index([status])
+  @@map("sources")
+}
+
+model CrawlJob {
+  id          String          @id @default(uuid())
+  sourceId    String
+  status      CrawlJobStatus  @default(PENDING)
+  
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  stats       Json?           // {pagesProcessed, documentsIndexed, errors}
+  errors      Json?           // Array of error messages
+  
+  createdBy   String?
+  createdAt   DateTime        @default(now())
+  
+  // Relations
+  source      Source          @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  
+  @@index([sourceId])
+  @@index([status])
+  @@map("crawl_jobs")
+}
+
+model Ticket {
+  id            String       @id @default(uuid())
+  title         String
+  description   String       @db.Text
+  ticketType    TicketType
+  priority      Priority     @default(MEDIUM)
+  status        TicketStatus @default(OPEN)
+  
+  attachmentUrl String?
+  
+  createdBy     String
+  assignedTo    String?
+  resolvedAt    DateTime?
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  // Relations
+  creator       User         @relation("TicketCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  assignee      User?        @relation("TicketAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  
+  @@index([status])
+  @@index([priority])
+  @@map("tickets")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  userId       String?
+  action       String   // "USER_CREATED", "ROLE_CHANGED", "SOURCE_ADDED", etc.
+  resourceType String   // "User", "Source", "Ticket", etc.
+  entityId     String?  // ID of affected entity
+  details      Json?    // Additional context
+  ipAddress    String?
+  
+  createdAt    DateTime @default(now())
+  
+  // Relations
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
