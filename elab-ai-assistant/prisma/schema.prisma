@@ -105,6 +105,10 @@ enum CrawlJobStatus {
 
 model User {
   id                String    @id @default(uuid())
+  // NOVA POLJA
+  firstName         String?
+  lastName          String?
+  profilePicture    String?
   email             String    @unique
   passwordHash      String
   role              UserRole  @default(USER)
@@ -144,8 +148,9 @@ model User {
 model Conversation {
   id        String    @id @default(uuid())
   userId    String
-  title     String    @default("Nova konverzacija")
-  
+  title     String    @default("New Conversation")
+  isArchived Boolean  @default(false) // novo
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   
@@ -168,6 +173,9 @@ model Message {
   processingTime  Int?        // milliseconds
   
   createdAt       DateTime    @default(now())
+
+  @@index([conversationId, createdAt]) // Composite index
+  @@index([role])                      // NOVO
   
   // Relations
   conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -194,6 +202,7 @@ model Rating {
   
   @@unique([messageId, userId]) // Jedan korisnik može oceniti poruku samo jednom
   @@index([messageId])
+  @@index([rating])             // NOVO - za statistiku
   @@map("ratings")
 }
 

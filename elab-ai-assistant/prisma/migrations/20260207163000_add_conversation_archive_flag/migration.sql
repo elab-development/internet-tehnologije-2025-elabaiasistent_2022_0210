@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "conversations" ADD COLUMN     "isArchived" BOOLEAN NOT NULL DEFAULT false,
+ALTER COLUMN "title" SET DEFAULT 'New Conversation';
