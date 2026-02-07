@@ -8,20 +8,22 @@ import { errorResponse, successResponse, ApiError } from '@/lib/api-response'
 
 /**
  * PATCH /api/moderator/flags/:id/resolve
- * Rešava flag
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireModerator()
     const body = await req.json()
     
+    const params = await context.params // ← AWAIT params
+    const { id } = params
+    
     const validatedData = resolveFlagSchema.parse(body)
 
     const flag = await prisma.flag.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!flag) {
@@ -29,7 +31,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.flag.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: validatedData.status,
         resolvedBy: user.id,

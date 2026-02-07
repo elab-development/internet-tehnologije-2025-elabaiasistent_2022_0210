@@ -1,23 +1,25 @@
 // src/app/api/chat/conversations/[id]/route.ts
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-helpers'
 import { errorResponse, successResponse, ApiError } from '@/lib/api-response'
 
 /**
  * GET /api/chat/conversations/:id
- * Vraća jednu konverzaciju sa svim porukama
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth()
+    
+    const params = await context.params // ← AWAIT params
+    const { id } = params
 
     const conversation = await prisma.conversation.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         messages: {
           orderBy: { createdAt: 'asc' },
@@ -51,17 +53,19 @@ export async function GET(
 
 /**
  * DELETE /api/chat/conversations/:id
- * Briše konverzaciju (ili je arhivira)
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth()
+    
+    const params = await context.params // ← AWAIT params
+    const { id } = params
 
     const conversation = await prisma.conversation.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!conversation) {
@@ -74,7 +78,7 @@ export async function DELETE(
 
     // Arhiviraj umesto brisanja
     await prisma.conversation.update({
-      where: { id: params.id },
+      where: { id },
       data: { isArchived: true },
     })
 
@@ -86,18 +90,20 @@ export async function DELETE(
 
 /**
  * PATCH /api/chat/conversations/:id
- * Ažurira naslov konverzacije
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth()
     const body = await req.json()
+    
+    const params = await context.params // ← AWAIT params
+    const { id } = params
 
     const conversation = await prisma.conversation.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!conversation) {
@@ -109,7 +115,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.conversation.update({
-      where: { id: params.id },
+      where: { id },
       data: { title: body.title },
     })
 
