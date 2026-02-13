@@ -1,6 +1,6 @@
 // prisma/seed.ts
 
-import { PrismaClient, UserRole, SourceType, Priority, CrawlFrequency } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -20,7 +20,7 @@ async function main() {
     create: {
       email: 'admin@fon.bg.ac.rs',
       passwordHash: await hashPassword('Admin123!'),
-      role: UserRole.ADMIN,
+      role: 'ADMIN',
       verified: true,
       status: 'ACTIVE',
     },
@@ -32,7 +32,7 @@ async function main() {
     create: {
       email: 'moderator@fon.bg.ac.rs',
       passwordHash: await hashPassword('Mod123!'),
-      role: UserRole.MODERATOR,
+      role: 'MODERATOR',
       verified: true,
       status: 'ACTIVE',
     },
@@ -44,7 +44,7 @@ async function main() {
     create: {
       email: 'student1@fon.bg.ac.rs',
       passwordHash: await hashPassword('Student123!'),
-      role: UserRole.USER,
+      role: 'USER',
       verified: true,
       status: 'ACTIVE',
     },
@@ -56,7 +56,7 @@ async function main() {
     create: {
       email: 'student2@fon.bg.ac.rs',
       passwordHash: await hashPassword('Student123!'),
-      role: UserRole.USER,
+      role: 'USER',
       verified: false,
       status: 'PENDING_VERIFICATION',
       verificationToken: 'sample-token-12345',
@@ -71,30 +71,30 @@ async function main() {
     prisma.source.create({
       data: {
         url: 'https://elab.fon.bg.ac.rs',
-        sourceType: SourceType.ELAB_MAIN,
-        priority: Priority.HIGH,
+        sourceType: 'ELAB_MAIN',
+        priority: 'HIGH',
         status: 'ACTIVE',
-        crawlFrequency: CrawlFrequency.WEEKLY,
+        crawlFrequency: 'WEEKLY',
         createdBy: admin.id,
       },
     }),
     prisma.source.create({
       data: {
         url: 'https://bc.elab.fon.bg.ac.rs',
-        sourceType: SourceType.ELAB_BC,
-        priority: Priority.MEDIUM,
+        sourceType: 'ELAB_BC',
+        priority: 'MEDIUM',
         status: 'ACTIVE',
-        crawlFrequency: CrawlFrequency.WEEKLY,
+        crawlFrequency: 'WEEKLY',
         createdBy: admin.id,
       },
     }),
     prisma.source.create({
       data: {
         url: 'https://ebt.rs',
-        sourceType: SourceType.ELAB_EBT,
-        priority: Priority.MEDIUM,
+        sourceType: 'ELAB_EBT',
+        priority: 'MEDIUM',
         status: 'ACTIVE',
-        crawlFrequency: CrawlFrequency.MONTHLY,
+        crawlFrequency: 'MONTHLY',
         createdBy: admin.id,
       },
     }),
