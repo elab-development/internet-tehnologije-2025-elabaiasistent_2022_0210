@@ -113,9 +113,11 @@ export default function ChatMessage({
                         </p>
                         <p className="text-xs text-gray-500 truncate">{source.url}</p>
                       </div>
-                      <Badge variant="info" size="sm" className="ml-2 flex-shrink-0">
-                        {(source.relevanceScore * 100).toFixed(0)}%
-                      </Badge>
+                      <div className="ml-2 flex-shrink-0">
+                        <Badge variant="info" size="sm">
+                          {(source.relevanceScore * 100).toFixed(0)}%
+                        </Badge>
+                      </div>
                     </a>
                   ))}
                 </div>

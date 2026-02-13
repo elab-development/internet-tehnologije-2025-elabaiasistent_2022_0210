@@ -229,9 +229,9 @@ export default function FAQManagementPage() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <Badge variant="info" size="sm" className="mb-2">
-                      {faq.category}
-                    </Badge>
+                    <div className="mb-2">
+                      <Badge variant="info" size="sm">{faq.category}</Badge>
+                    </div>
                     <CardTitle>{faq.question}</CardTitle>
                   </div>
                   <div className="flex items-center space-x-2">
