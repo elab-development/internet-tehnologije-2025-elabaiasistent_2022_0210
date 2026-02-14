@@ -28,3 +28,5 @@ jobs:
       - name: 🔨 Build application
         working-directory: elab-ai-assistant
         run: npm run build
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
