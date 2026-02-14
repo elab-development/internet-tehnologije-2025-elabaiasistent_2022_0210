@@ -3,8 +3,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { registerSchema } from '@/lib/validations/auth'
+import { sendVerificationEmail } from '@/lib/email'
 import bcrypt from 'bcryptjs'
 import { randomBytes } from 'crypto'
+
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,9 +57,25 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // TODO: Poslati verifikacioni email (za sada samo logujemo)
-    console.log('📧 Verification token:', verificationToken)
-    console.log('🔗 Verification link:', `${process.env.NEXTAUTH_URL}/verify?token=${verificationToken}`)
+    // Pošalji verifikacioni email
+    const emailResult = await sendVerificationEmail(user.email, verificationToken)
+
+    if (!emailResult.success) {
+      console.error('⚠ Failed to send verification email:', emailResult.error)
+      
+      // Ne blokiraj registraciju ako email ne uspe
+      // Korisnik može kasnije zatražiti novi verifikacioni email
+      return NextResponse.json(
+        {
+          message: 'Registracija uspešna, ali email nije poslat. Kontaktirajte podršku.',
+          user,
+          emailError: emailResult.error,
+        },
+        { status: 201 }
+      )
+    }
+
+    console.log('✅ User registered and verification email sent:', user.email)
 
     // Kreiraj audit log
     await prisma.auditLog.create({
@@ -67,6 +87,7 @@ export async function POST(req: NextRequest) {
         details: {
           email: user.email,
           role: user.role,
+          emailSent: true,
         },
         ipAddress: req.headers.get('x-forwarded-for') || 'unknown',
       },

@@ -24,8 +24,12 @@ export default function RegisterPage() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.email.endsWith('@fon.bg.ac.rs')) {
-      newErrors.email = 'Morate koristiti FON email adresu'
+    if (
+      !formData.email.endsWith('@fon.bg.ac.rs') &&
+      !formData.email.endsWith('@student.fon.bg.ac.rs')
+    ) {
+      newErrors.email =
+        'Morate koristiti FON email adresu (@fon.bg.ac.rs ili @student.fon.bg.ac.rs)'
     }
 
     if (formData.password.length < 8) {
@@ -133,7 +137,7 @@ export default function RegisterPage() {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 error={errors.email}
-                helperText="Morate koristiti FON email (@fon.bg.ac.rs)"
+                helperText="Morate koristiti FON email (@fon.bg.ac.rs ili @student.fon.bg.ac.rs)"
                 required
                 disabled={isLoading}
               />

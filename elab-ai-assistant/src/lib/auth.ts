@@ -22,7 +22,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Validacija FON email domena (FZ-1)
-        if (!credentials.email.endsWith('@fon.bg.ac.rs')) {
+        if (!credentials.email.endsWith('@fon.bg.ac.rs') && !credentials.email.endsWith('@student.fon.bg.ac.rs')){
           throw new Error('Morate koristiti FON email adresu (@fon.bg.ac.rs)')
         }
 

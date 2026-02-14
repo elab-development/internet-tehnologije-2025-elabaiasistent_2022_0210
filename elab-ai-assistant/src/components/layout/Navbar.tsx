@@ -23,10 +23,11 @@ export default function Navbar() {
   const pathname = usePathname()
 
   const navItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['USER', 'MODERATOR', 'ADMIN'] },
-    { href: '/chat', label: 'Chat', icon: MessageSquare, roles: ['USER', 'MODERATOR', 'ADMIN'] },
-    { href: '/moderator', label: 'Moderator', icon: Flag, roles: ['MODERATOR', 'ADMIN'] },
-    { href: '/admin', label: 'Admin', icon: Users, roles: ['ADMIN'] },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['USER', 'MODERATOR', 'ADMIN'] },
+  { href: '/chat', label: 'Chat', icon: MessageSquare, roles: ['USER', 'MODERATOR', 'ADMIN'] },
+  { href: '/docs', label: 'API Docs', icon: FileQuestion, roles: ['USER', 'MODERATOR', 'ADMIN'] }, // NOVO
+  { href: '/moderator', label: 'Moderator', icon: Flag, roles: ['MODERATOR', 'ADMIN'] },
+  { href: '/admin', label: 'Admin', icon: Users, roles: ['ADMIN'] },
   ]
 
   const filteredNavItems = navItems.filter(item => 

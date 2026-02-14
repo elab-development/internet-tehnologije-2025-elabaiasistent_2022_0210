@@ -6,6 +6,9 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { sendMessageSchema } from '@/lib/validations/chat'
 import { errorResponse, successResponse, ApiError } from '@/lib/api-response'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * POST /api/chat/messages
  * Šalje poruku i generiše AI odgovor (mock za sada)

@@ -6,6 +6,9 @@ import { requireModerator } from '@/lib/auth-helpers'
 import { createFAQSchema } from '@/lib/validations/moderator'
 import { errorResponse, successResponse } from '@/lib/api-response'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * GET /api/moderator/faq
  * Vraća sve FAQ unose
