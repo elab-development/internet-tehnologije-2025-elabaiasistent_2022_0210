@@ -6,6 +6,9 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { rateMessageSchema } from '@/lib/validations/chat'
 import { errorResponse, successResponse, ApiError } from '@/lib/api-response'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * POST /api/chat/ratings
  * Ocenjuje AI odgovor

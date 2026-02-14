@@ -6,6 +6,9 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { createConversationSchema } from '@/lib/validations/chat'
 import { errorResponse, successResponse } from '@/lib/api-response'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * GET /api/chat/conversations
  * Vraća sve konverzacije trenutnog korisnika

@@ -5,6 +5,10 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth-helpers'
 import { errorResponse, successResponse } from '@/lib/api-response'
 
+// 🔹 KLJUČNO: Spreči statički rendering
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * GET /api/admin/users
  * Vraća sve korisnike

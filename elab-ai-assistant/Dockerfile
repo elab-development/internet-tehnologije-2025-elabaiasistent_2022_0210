@@ -24,6 +24,21 @@ COPY --from=deps /app/node_modules ./node_modules
 # Kopiraj source code
 COPY . .
 
+# 🔹 BUILD ARGUMENTI - Prosleđuju se iz docker-compose.yml
+ARG RESEND_API_KEY
+ARG DATABASE_URL
+ARG NEXTAUTH_SECRET
+ARG NEXTAUTH_URL
+ARG NEXT_PUBLIC_APP_URL
+
+# 🔹 SETOVANJE ENV VARIJABLI za build proces
+# Ove će biti dostupne tokom `npm run build`
+ENV RESEND_API_KEY=${RESEND_API_KEY:-re_GBKSrAmr_MKXTXNj5r7oZQ6PYCSE7qWQh}
+ENV DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/elab_ai}
+ENV NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-dummy-secret-minimum-32-characters-long}
+ENV NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+
 # Generiši Prisma Client
 RUN npx prisma generate
 
@@ -39,6 +54,9 @@ WORKDIR /app
 
 # Postavi environment na production
 ENV NODE_ENV=production
+
+# 🔹 Runtime ENV varijable će biti setovane iz docker-compose.yml
+# Ne postavljamo ih ovde, jer će biti override-ovane
 
 # Kreiraj non-root korisnika
 RUN addgroup --system --gid 1001 nodejs

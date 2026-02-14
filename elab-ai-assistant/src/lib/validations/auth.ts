@@ -7,8 +7,10 @@ export const registerSchema = z.object({
     .string()
     .email('Neispravna email adresa')
     .refine(
-      (email) => email.endsWith('@fon.bg.ac.rs'),
-      'Morate koristiti FON email adresu (@fon.bg.ac.rs)'
+      (email) =>
+        email.endsWith('@fon.bg.ac.rs') ||
+        email.endsWith('@student.fon.bg.ac.rs'),
+      'Morate koristiti FON email adresu (@fon.bg.ac.rs ili @student.fon.bg.ac.rs)'
     ),
   password: z
     .string()

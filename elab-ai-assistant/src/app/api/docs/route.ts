@@ -3,6 +3,9 @@
 import { NextResponse } from 'next/server'
 import { swaggerSpec } from '@/lib/swagger'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * GET /api/docs
  * Vraća OpenAPI specifikaciju u JSON formatu

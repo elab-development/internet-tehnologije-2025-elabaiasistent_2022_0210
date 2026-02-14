@@ -3,15 +3,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+// 🔹 KLJUČNO: Spreči statički rendering
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET(req: NextRequest) {
   try {
     const token = req.nextUrl.searchParams.get('token')
 
     if (!token) {
-      return NextResponse.json(
-        { error: 'Token je obavezan' },
-        { status: 400 }
-      )
+      return NextResponse.redirect(new URL('/login?error=missing_token', req.url))
     }
 
     // Pronađi korisnika sa tokenom
@@ -25,10 +26,7 @@ export async function GET(req: NextRequest) {
     })
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Nevažeći ili istekli token' },
-        { status: 400 }
-      )
+      return NextResponse.redirect(new URL('/login?error=invalid_token', req.url))
     }
 
     // Verifikuj korisnika
@@ -53,14 +51,12 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    return NextResponse.json({
-      message: 'Email uspešno verifikovan! Možete se prijaviti.',
-    })
+    console.log('✅ Email verified for user:', user.email)
+
+    // Redirect na login sa success porukom
+    return NextResponse.redirect(new URL('/login?verified=true', req.url))
   } catch (error) {
     console.error('Verification error:', error)
-    return NextResponse.json(
-      { error: 'Greška pri verifikaciji' },
-      { status: 500 }
-    )
+    return NextResponse.redirect(new URL('/login?error=verification_failed', req.url))
   }
 }

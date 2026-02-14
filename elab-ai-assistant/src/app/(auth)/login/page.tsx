@@ -1,28 +1,49 @@
-// src/app/(auth)/login/page.tsx
-
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import Card, { CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle } from 'lucide-react'
 
-export default function LoginPage() {
+// 🔹 Izdvoj komponentu koja koristi useSearchParams
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   })
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  // Proveri URL parametre za poruke
+  useEffect(() => {
+    const verified = searchParams.get('verified')
+    const errorParam = searchParams.get('error')
+
+    if (verified === 'true') {
+      setSuccess('✅ Email uspešno verifikovan! Možete se prijaviti.')
+    }
+
+    if (errorParam === 'invalid_token') {
+      setError('❌ Nevažeći ili istekli verifikacioni link. Registrujte se ponovo.')
+    } else if (errorParam === 'missing_token') {
+      setError('❌ Verifikacioni token nedostaje.')
+    } else if (errorParam === 'verification_failed') {
+      setError('❌ Greška pri verifikaciji. Pokušajte ponovo.')
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setSuccess('')
     setIsLoading(true)
 
     try {
@@ -64,6 +85,15 @@ export default function LoginPage() {
           
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Success Message */}
+              {success && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start">
+                  <CheckCircle className="h-5 w-5 text-green-600 mr-2 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-green-800">{success}</p>
+                </div>
+              )}
+
+              {/* Error Message */}
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start">
                   <AlertCircle className="h-5 w-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
@@ -120,5 +150,18 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// 🔹 Wrappuj u Suspense sa fallback-om
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-gray-600">Učitavanje...</div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
