@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:crawler": "tsx scripts/test-crawler.ts"
+    "test:crawler": "tsx scripts/test-crawler.ts",
+    "test:ollama": "tsx scripts/test-ollama.ts"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",

@@ -120,3 +120,25 @@ volumes:
 networks:
   elab-network:
     driver: bridge
+
+  # ============================================
+  # Ollama LLM Service (opciono - za production)
+  # ============================================
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: elab-ollama
+  #   restart: unless-stopped
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   networks:
+  #     - elab-network
+  #   # GPU support (zahteva nvidia-docker)
+  #   # deploy:
+  #   #   resources:
+  #   #     reservations:
+  #   #       devices:
+  #   #         - driver: nvidia
+  #   #           count: 1
+  #   #           capabilities: [gpu]

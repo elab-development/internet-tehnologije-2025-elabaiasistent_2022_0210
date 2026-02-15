@@ -4,14 +4,13 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-helpers'
 import { sendMessageSchema } from '@/lib/validations/chat'
+import { getVectorDB } from '@/lib/vector-db'
+import { getOllamaClient } from '@/lib/ollama'
 import { errorResponse, successResponse, ApiError } from '@/lib/api-response'
-
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
 
 /**
  * POST /api/chat/messages
- * Šalje poruku i generiše AI odgovor (mock za sada)
+ * Šalje poruku i generiše AI odgovor koristeći RAG
  */
 export async function POST(req: NextRequest) {
   try {
@@ -23,6 +22,12 @@ export async function POST(req: NextRequest) {
     // Proveri da li konverzacija pripada korisniku
     const conversation = await prisma.conversation.findUnique({
       where: { id: validatedData.conversationId },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'asc' },
+          take: 10, // Poslednje 10 poruka za kontekst
+        },
+      },
     })
 
     if (!conversation) {
@@ -35,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     const startTime = Date.now()
 
-    // Kreiraj korisničku poruku
+    // 1. Kreiraj korisničku poruku
     const userMessage = await prisma.message.create({
       data: {
         conversationId: validatedData.conversationId,
@@ -44,69 +49,123 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // MOCK AI RESPONSE (za sada)
-    // TODO: Integrisati RAG engine i Ollama
-    const mockAIResponse = generateMockResponse(validatedData.content)
-    const processingTime = Date.now() - startTime
+    console.log('💬 User message:', validatedData.content)
 
+    // 2. Pretraži vektorsku bazu za relevantne kontekste
+    const vectorDB = await getVectorDB()
+    const searchResults = await vectorDB.search(validatedData.content, {
+      limit: 5,
+      minRelevance: 0.3,
+    })
+
+    console.log(`📚 Found ${searchResults.length} relevant contexts`)
+
+    // 3. Pripremi kontekste za RAG
+    const contexts = searchResults.map(result => ({
+      content: result.content,
+      url: result.metadata.url,
+      title: result.metadata.title,
+      relevanceScore: result.relevanceScore,
+    }))
+
+    // 4. Pripremi istoriju konverzacije
+    const conversationHistory = conversation.messages.map(msg => ({
+      role: msg.role === 'USER' ? ('user' as const) : ('assistant' as const),
+      content: msg.content,
+    }))
+
+    // 5. Generiši AI odgovor koristeći Ollama + RAG
+    let aiResponse: string
+    let sources: any[]
+    let processingTime: number
+
+    try {
+      const ollamaClient = getOllamaClient()
+
+      // Proveri da li je Ollama dostupan
+      const isHealthy = await ollamaClient.healthCheck()
+      if (!isHealthy) {
+        throw new Error('Ollama servis nije dostupan')
+      }
+
+      const ragResponse = await ollamaClient.generateRAGResponse(
+        validatedData.content,
+        contexts,
+        conversationHistory
+      )
+
+      aiResponse = ragResponse.answer
+      sources = ragResponse.sources
+      processingTime = ragResponse.processingTime
+
+      console.log(`✅ AI response generated in ${processingTime}ms`)
+    } catch (ollamaError: any) {
+      console.error('❌ Ollama error:', ollamaError.message)
+
+      // Fallback na mock odgovor ako Ollama ne radi
+      aiResponse = generateFallbackResponse(validatedData.content, contexts)
+      sources = contexts.map(ctx => ({
+        url: ctx.url,
+        title: ctx.title,
+        relevanceScore: Math.round(ctx.relevanceScore * 100),
+      }))
+      processingTime = Date.now() - startTime
+    }
+
+    // 6. Sačuvaj AI poruku
     const aiMessage = await prisma.message.create({
       data: {
         conversationId: validatedData.conversationId,
         role: 'ASSISTANT',
-        content: mockAIResponse.content,
-        sources: mockAIResponse.sources,
+        content: aiResponse,
+        sources: sources,
         processingTime,
       },
     })
 
-    // Ažuriraj updatedAt konverzacije
+    // 7. Ažuriraj updatedAt konverzacije
     await prisma.conversation.update({
       where: { id: validatedData.conversationId },
       data: { updatedAt: new Date() },
     })
 
-    return successResponse({
-      userMessage,
-      aiMessage,
-    }, 201)
+    return successResponse(
+      {
+        userMessage,
+        aiMessage,
+      },
+      201
+    )
   } catch (error) {
     return errorResponse(error)
   }
 }
 
 /**
- * Mock funkcija za generisanje AI odgovora
- * TODO: Zameniti sa pravim RAG engine-om
+ * Fallback odgovor ako Ollama nije dostupan
  */
-function generateMockResponse(question: string) {
-  const mockResponses = [
-    {
-      content: 'Na osnovu dostupnih informacija sa ELAB platforme, mogu vam reći da...\n\nIspitni rokovi za E-poslovanje su:\n- Januarski rok: 15.01.2024\n- Februarski rok: 10.02.2024\n- Junski rok: 20.06.2024\n\nPreporučujem da proverite tačne termine na zvaničnom sajtu.',
-      sources: [
-        {
-          url: 'https://elab.fon.bg.ac.rs/ispiti',
-          title: 'Raspored ispita - ELAB',
-          relevanceScore: 0.95,
-        },
-        {
-          url: 'https://elab.fon.bg.ac.rs/predmeti/e-poslovanje',
-          title: 'E-poslovanje - Informacije o predmetu',
-          relevanceScore: 0.87,
-        },
-      ],
-    },
-    {
-      content: 'Pronašao sam sledeće informacije u bazi znanja:\n\nMaterijali za učenje su dostupni u sekciji "Materijali" svakog predmeta. Možete preuzeti:\n- Prezentacije sa predavanja\n- Skripte\n- Primere zadataka\n- Video snimke',
-      sources: [
-        {
-          url: 'https://elab.fon.bg.ac.rs/materijali',
-          title: 'Materijali za učenje',
-          relevanceScore: 0.92,
-        },
-      ],
-    },
-  ]
+function generateFallbackResponse(question: string, contexts: any[]): string {
+  if (contexts.length === 0) {
+    return `Nisam pronašao relevantne informacije u ELAB dokumentaciji za pitanje: "${question}". 
 
-  // Vraća random mock odgovor
-  return mockResponses[Math.floor(Math.random() * mockResponses.length)]
+Molim vas da:
+1. Preformulišete pitanje
+2. Posetite direktno ELAB sajtove:
+   - https://elab.fon.bg.ac.rs
+   - https://bc.elab.fon.bg.ac.rs
+   - https://ebt.rs
+
+Napomena: AI servis trenutno nije dostupan, koristim osnovnu pretragu.`
+  }
+
+  const contextSummary = contexts
+    .slice(0, 2)
+    .map(ctx => `- ${ctx.title}: ${ctx.content.slice(0, 150)}...`)
+    .join('\n')
+
+  return `Na osnovu pronađenih informacija:
+
+${contextSummary}
+
+Napomena: AI servis trenutno nije dostupan. Ovo je automatski generisan odgovor baziran na pretrazi dokumenata. Za detaljnije informacije, posetite izvorne stranice.`
 }
