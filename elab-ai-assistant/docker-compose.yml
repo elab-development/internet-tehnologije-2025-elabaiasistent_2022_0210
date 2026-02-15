@@ -1,9 +1,5 @@
 # docker-compose.yml
-
-# ============================================
-# NAPOMENA: 'version' je zastareo u Docker Compose v2
-# Više info: https://docs.docker.com/compose/compose-file/
-# ============================================
+# ELAB AI Assistant - Docker Compose Configuration
 
 services:
   # ============================================
@@ -30,13 +26,37 @@ services:
       - elab-network
 
   # ============================================
+  # ChromaDB Vector Database (with curl installed)
+  # ============================================
+  chromadb:
+    build:
+      context: .
+      dockerfile: Dockerfile.chromadb
+    container_name: elab-chromadb
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/data
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - elab-network
+
+  # ============================================
   # Next.js Application
   # ============================================
   app:
     build:
       context: .
       dockerfile: Dockerfile
-      # 🔹 Prosleđivanje build argumenata
       args:
         - RESEND_API_KEY=${RESEND_API_KEY}
         - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/elab_ai
@@ -63,10 +83,15 @@ services:
       APP_URL: ${APP_URL:-http://localhost:3000}
       NEXT_PUBLIC_APP_URL: ${APP_URL:-http://localhost:3000}
       
+      # ChromaDB
+      CHROMA_URL: ${CHROMA_URL:-http://chromadb:8000}
+      
       # Node environment
       NODE_ENV: production
     depends_on:
       postgres:
+        condition: service_healthy
+      chromadb:
         condition: service_healthy
     networks:
       - elab-network
@@ -80,28 +105,14 @@ services:
         node server.js
       "
 
-  # ============================================
-  # ChromaDB (dodaćemo kasnije u Commit 5)
-  # ============================================
-  # chromadb:
-  #   image: chromadb/chroma:latest
-  #   container_name: elab-chromadb
-  #   restart: unless-stopped
-  #   ports:
-  #     - "8000:8000"
-  #   volumes:
-  #     - chroma_data:/chroma/chroma
-  #   networks:
-  #     - elab-network
-
 # ============================================
 # Volumes
 # ============================================
 volumes:
   postgres_data:
     driver: local
-  # chroma_data:
-  #   driver: local
+  chroma_data:
+    driver: local
 
 # ============================================
 # Networks
@@ -109,3 +120,25 @@ volumes:
 networks:
   elab-network:
     driver: bridge
+
+  # ============================================
+  # Ollama LLM Service (opciono - za production)
+  # ============================================
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: elab-ollama
+  #   restart: unless-stopped
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   networks:
+  #     - elab-network
+  #   # GPU support (zahteva nvidia-docker)
+  #   # deploy:
+  #   #   resources:
+  #   #     reservations:
+  #   #       devices:
+  #   #         - driver: nvidia
+  #   #           count: 1
+  #   #           capabilities: [gpu]

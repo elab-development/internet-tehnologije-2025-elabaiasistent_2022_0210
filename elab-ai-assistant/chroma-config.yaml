@@ -1,0 +1,20 @@
+# chroma-config.yaml
+# ChromaDB Server Configuration
+
+# Server settings
+is_persistent: true
+persist_directory: /data
+
+# Authentication (disabled for development)
+chroma_server_auth_provider: chromadb.auth.token_authn.TokenAuthenticationServerProvider
+chroma_server_auth_credentials_provider: chromadb.auth.token_authn.TokenConfigurationServerAuthenticationCredentialsProvider
+
+# Allow database reset (development only)
+allow_reset: true
+
+# Telemetry
+anonymized_telemetry: false
+
+# Server host and port
+chroma_server_host: 0.0.0.0
+chroma_server_http_port: 8000
