@@ -124,14 +124,14 @@ export default function AdminPage() {
           </Card>
         </Link>
 
-        <Link href="/admin/logs">
+        <Link href="/admin/crawl">
           <Card hover className="h-full">
             <CardHeader>
-              <CardTitle>Sistemski logovi</CardTitle>
+              <CardTitle>Crawl Job-ovi</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-gray-600 text-sm">
-                Pregledajte audit trail i sistemske greške
+                Pokrenite indeksiranje i pratite status job-ova
               </p>
             </CardContent>
           </Card>

@@ -5,6 +5,11 @@
  * Wrapper za Ollama API sa RAG funkcionalnostima
  */
 
+// 🔹 ENSURE this runs ONLY on server
+if (typeof window !== 'undefined') {
+  throw new Error('OllamaClient can only be used on the server side')
+}
+
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2'
 

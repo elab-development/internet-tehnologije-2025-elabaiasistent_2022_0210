@@ -1,5 +1,10 @@
 // src/lib/vector-db.ts
 
+// 🔹 ENSURE this runs ONLY on server
+if (typeof window !== 'undefined') {
+  throw new Error('VectorDB can only be used on the server side')
+}
+
 import { ChromaClient, Collection } from 'chromadb'
 import { SimpleEmbedding } from './embeddings'
 
