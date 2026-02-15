@@ -1,0 +1,17 @@
+# Dockerfile.chromadb
+# ChromaDB with curl for healthcheck
+
+FROM chromadb/chroma:latest
+
+# Install curl for healthcheck
+RUN apt-get update && \
+    apt-get install -y curl netcat-openbsd && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy custom config (optional)
+# COPY chroma-config.yaml /config.yaml
+
+# Expose port
+EXPOSE 8000
+
+# Use default entrypoint from base image

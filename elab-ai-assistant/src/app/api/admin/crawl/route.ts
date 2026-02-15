@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth-helpers'
 import { WebCrawler } from '@/lib/crawler'
 import { TextChunker } from '@/lib/text-chunker'
+import { getVectorDB, VectorDocument } from '@/lib/vector-db'
 import { errorResponse, successResponse, ApiError } from '@/lib/api-response'
 
 /**
@@ -16,13 +17,12 @@ export async function POST(req: NextRequest) {
     const admin = await requireAdmin()
     const body = await req.json()
 
-    const { sourceIds } = body // Array of source IDs to crawl
+    const { sourceIds } = body
 
     if (!sourceIds || !Array.isArray(sourceIds) || sourceIds.length === 0) {
       throw new ApiError('Morate navesti najmanje jedan izvor', 400)
     }
 
-    // Učitaj izvore iz baze
     const sources = await prisma.source.findMany({
       where: {
         id: { in: sourceIds },
@@ -36,10 +36,9 @@ export async function POST(req: NextRequest) {
 
     console.log(`🚀 Starting crawl job for ${sources.length} sources`)
 
-    // Kreiraj crawl job u bazi
     const crawlJob = await prisma.crawlJob.create({
       data: {
-        sourceId: sources[0].id, // Za sada koristimo prvi izvor
+        sourceId: sources[0].id,
         status: 'RUNNING',
         startedAt: new Date(),
         createdBy: admin.id,
@@ -60,7 +59,7 @@ export async function POST(req: NextRequest) {
           startedAt: crawlJob.startedAt,
         },
       },
-      202 // Accepted
+      202
     )
   } catch (error) {
     return errorResponse(error)
@@ -68,7 +67,7 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Asinhrona funkcija za crawlovanje dokumenata
+ * Asinhrona funkcija za crawlovanje i indeksiranje dokumenata
  */
 async function crawlDocuments(sources: any[], crawlJobId: string) {
   try {
@@ -83,6 +82,8 @@ async function crawlDocuments(sources: any[], crawlJobId: string) {
       chunkOverlap: 50,
     })
 
+    const vectorDB = await getVectorDB()
+
     let totalDocuments = 0
     let totalChunks = 0
     const errors: string[] = []
@@ -95,15 +96,35 @@ async function crawlDocuments(sources: any[], crawlJobId: string) {
         const documents = await crawler.crawl(source.url)
         totalDocuments += documents.length
 
-        // Kreiraj chunk-ove za svaki dokument
+        // Pripremi dokumente za ChromaDB
+        const vectorDocuments: VectorDocument[] = []
+
         for (const doc of documents) {
           const chunks = chunker.createChunks(doc.content)
           totalChunks += chunks.length
 
           console.log(`📄 Document: ${doc.title} → ${chunks.length} chunks`)
 
-          // TODO: U sledećem commit-u ćemo čuvati chunk-ove u ChromaDB
-          // Za sada samo logujemo
+          // Kreiraj VectorDocument za svaki chunk
+          for (const chunk of chunks) {
+            vectorDocuments.push({
+              id: `${source.id}-${doc.url}-chunk-${chunk.index}`,
+              content: chunk.content,
+              metadata: {
+                url: doc.url,
+                title: doc.title,
+                sourceType: doc.metadata.sourceType,
+                chunkIndex: chunk.index,
+                crawledAt: new Date().toISOString(),
+              },
+            })
+          }
+        }
+
+        // Dodaj u ChromaDB
+        if (vectorDocuments.length > 0) {
+          await vectorDB.addDocuments(vectorDocuments)
+          console.log(`✅ Indexed ${vectorDocuments.length} chunks in ChromaDB`)
         }
 
         // Ažuriraj source lastCrawledAt
@@ -136,7 +157,6 @@ async function crawlDocuments(sources: any[], crawlJobId: string) {
   } catch (error: any) {
     console.error('❌ Crawl job error:', error)
 
-    // Ažuriraj status na FAILED
     await prisma.crawlJob.update({
       where: { id: crawlJobId },
       data: {
