@@ -3,13 +3,12 @@
 'use client'
 
 import { useEffect, useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Card, { CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
-import Input from '@/components/ui/Input'
 import Badge from '@/components/ui/Badge'
 import Spinner from '@/components/ui/Spinner'
-import { Flag, CheckCircle, XCircle, AlertCircle, X } from 'lucide-react'
+import { Flag, CheckCircle, XCircle, AlertCircle, X, Info } from 'lucide-react'
 
 interface FlagItem {
   id: string
@@ -41,14 +40,19 @@ interface FlagItem {
 // ============================================
 function FlagsContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const conversationId = searchParams.get('conversationId')
+  const messageId = searchParams.get('messageId')
 
   const [flags, setFlags] = useState<FlagItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  
+  // ✅ Modal se prikazuje SAMO ako dolazi sa URL parametrima
   const [showCreateModal, setShowCreateModal] = useState(!!conversationId)
+  
   const [formData, setFormData] = useState({
     conversationId: conversationId || '',
-    messageId: '',
+    messageId: messageId || '',
     flagType: 'OTHER',
     description: '',
     priority: 'MEDIUM',
@@ -79,10 +83,25 @@ function FlagsContent() {
     setError('')
 
     try {
+      const payload: any = {
+        flagType: formData.flagType,
+        priority: formData.priority,
+      }
+
+      if (formData.conversationId) {
+        payload.conversationId = formData.conversationId
+      }
+      if (formData.messageId) {
+        payload.messageId = formData.messageId
+      }
+      if (formData.description) {
+        payload.description = formData.description
+      }
+
       const response = await fetch('/api/moderator/flags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       })
 
       const data = await response.json()
@@ -93,6 +112,10 @@ function FlagsContent() {
 
       setSuccess('Flag uspešno kreiran!')
       setShowCreateModal(false)
+      
+      // ✅ Očisti URL parametre nakon kreiranja
+      router.push('/moderator/flags')
+      
       setFormData({
         conversationId: '',
         messageId: '',
@@ -100,6 +123,7 @@ function FlagsContent() {
         description: '',
         priority: 'MEDIUM',
       })
+      
       await fetchFlags()
 
       setTimeout(() => setSuccess(''), 3000)
@@ -108,6 +132,12 @@ function FlagsContent() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleCloseModal = () => {
+    setShowCreateModal(false)
+    // ✅ Očisti URL parametre ako korisnik odustane
+    router.push('/moderator/flags')
   }
 
   const handleResolveFlag = async (flagId: string, status: 'RESOLVED' | 'DISMISSED') => {
@@ -184,10 +214,20 @@ function FlagsContent() {
             Pregledajte i rešavajte problematične upite
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Flag className="h-4 w-4 mr-2" />
-          Kreiraj Flag
-        </Button>
+        
+        {/* ✅ UKLONJEN "Kreiraj Flag" dugme - flagovi se kreiraju samo iz konverzacija */}
+      </div>
+
+      {/* Info Message */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start">
+        <Info className="h-5 w-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+        <div className="text-sm text-blue-800">
+          <p className="font-medium mb-1">Kako kreirati flag?</p>
+          <p>
+            Flagovi se kreiraju direktno iz konverzacija. Pronađite problematičnu poruku 
+            i kliknite na ikonu <Flag className="h-3 w-3 inline mx-1" /> da prijavite problem.
+          </p>
+        </div>
       </div>
 
       {/* Success/Error Messages */}
@@ -211,7 +251,10 @@ function FlagsContent() {
           <Card>
             <CardContent className="text-center py-12">
               <Flag className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600">Nema flag-ova u sistemu</p>
+              <p className="text-gray-600 font-medium mb-1">Nema flag-ova u sistemu</p>
+              <p className="text-sm text-gray-500">
+                Kada korisnici prijave probleme, pojaviće se ovde
+              </p>
             </CardContent>
           </Card>
         ) : (
@@ -239,6 +282,14 @@ function FlagsContent() {
                         </p>
                         <p className="text-gray-900 line-clamp-2">
                           {flag.message.content}
+                        </p>
+                      </div>
+                    )}
+
+                    {flag.conversation && !flag.message && (
+                      <div className="p-3 bg-gray-50 rounded-lg text-sm mb-3">
+                        <p className="text-gray-600">
+                          <strong>Konverzacija:</strong> {flag.conversation.title}
                         </p>
                       </div>
                     )}
@@ -302,15 +353,15 @@ function FlagsContent() {
         )}
       </div>
 
-      {/* Create Flag Modal */}
+      {/* Create Flag Modal - Prikazuje se SAMO kada dolazi sa conversationId */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <Card className="max-w-2xl w-full">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Kreiraj Flag</CardTitle>
+                <CardTitle>Prijavi problem</CardTitle>
                 <button
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={handleCloseModal}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <X className="h-6 w-6" />
@@ -325,14 +376,15 @@ function FlagsContent() {
                   </div>
                 )}
 
-                <Input
-                  label="Conversation ID (opciono)"
-                  value={formData.conversationId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, conversationId: e.target.value })
-                  }
-                  disabled={isSubmitting}
-                />
+                {/* Info o kontekstu */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    <strong>Kontekst:</strong> {formData.conversationId ? 'Konverzacija' : 'Poruka'} ID: 
+                    <code className="ml-2 px-2 py-1 bg-blue-100 rounded text-xs">
+                      {formData.conversationId || formData.messageId}
+                    </code>
+                  </p>
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -343,8 +395,9 @@ function FlagsContent() {
                     onChange={(e) =>
                       setFormData({ ...formData, flagType: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
+                    disabled={isSubmitting}
                   >
                     <option value="INAPPROPRIATE_CONTENT">Neprikladan sadržaj</option>
                     <option value="SPAM">Spam</option>
@@ -363,7 +416,8 @@ function FlagsContent() {
                     onChange={(e) =>
                       setFormData({ ...formData, priority: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isSubmitting}
                   >
                     <option value="LOW">Nizak</option>
                     <option value="MEDIUM">Srednji</option>
@@ -374,30 +428,36 @@ function FlagsContent() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Opis problema
+                    Opis problema <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     value={formData.description}
                     onChange={(e) =>
                       setFormData({ ...formData, description: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     rows={4}
                     placeholder="Opišite problem detaljno..."
+                    required
+                    disabled={isSubmitting}
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Minimalno 10 karaktera
+                  </p>
                 </div>
 
-                <div className="flex justify-end space-x-2">
+                <div className="flex justify-end space-x-2 pt-2">
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => setShowCreateModal(false)}
+                    onClick={handleCloseModal}
                     disabled={isSubmitting}
                   >
                     Otkaži
                   </Button>
                   <Button type="submit" isLoading={isSubmitting}>
-                    Kreiraj Flag
+                    <Flag className="h-4 w-4 mr-2" />
+                    Prijavi problem
                   </Button>
                 </div>
               </form>
@@ -420,8 +480,9 @@ function FlagsLoadingFallback() {
           <div className="h-8 bg-gray-200 rounded w-32 mb-2 animate-pulse"></div>
           <div className="h-4 bg-gray-200 rounded w-64 animate-pulse"></div>
         </div>
-        <div className="h-10 bg-gray-200 rounded w-32 animate-pulse"></div>
       </div>
+
+      <div className="h-20 bg-gray-200 rounded animate-pulse"></div>
 
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (

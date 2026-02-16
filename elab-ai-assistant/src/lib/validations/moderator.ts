@@ -2,9 +2,32 @@
 
 import { z } from 'zod'
 
+// ✅ Opcioni ID-evi (prihvata bilo koji string, ne samo UUID)
+const optionalId = z.preprocess(
+  (val) => {
+    // Pretvori prazan string, null ili undefined u undefined
+    if (val === '' || val === null || val === undefined) {
+      return undefined
+    }
+    return val
+  },
+  z.string().optional()  // ✅ BEZ .uuid() - dozvoljava bilo koji string!
+)
+
+// ✅ Opcioni stringovi
+const optionalString = z.preprocess(
+  (val) => {
+    if (val === '' || val === null || val === undefined) {
+      return undefined
+    }
+    return val
+  },
+  z.string().optional()
+)
+
 export const createFlagSchema = z.object({
-  messageId: z.string().uuid().optional(),
-  conversationId: z.string().uuid().optional(),
+  messageId: optionalId,           // ✅ Prihvata "123", "abc", UUID, bilo šta
+  conversationId: optionalId,      // ✅ Prihvata "123", "abc", UUID, bilo šta
   flagType: z.enum([
     'INAPPROPRIATE_CONTENT',
     'SPAM',
@@ -12,7 +35,15 @@ export const createFlagSchema = z.object({
     'TECHNICAL_ERROR',
     'OTHER',
   ]),
-  description: z.string().max(1000).optional(),
+  description: z.preprocess(
+    (val) => {
+      if (val === '' || val === null || val === undefined) {
+        return undefined
+      }
+      return val
+    },
+    z.string().max(1000).optional()
+  ),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).default('MEDIUM'),
 })
 
