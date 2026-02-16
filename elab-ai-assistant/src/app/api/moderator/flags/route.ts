@@ -86,12 +86,12 @@ export async function POST(req: NextRequest) {
       console.error('🔴 [BACKEND] Step 3: ❌ Validation FAILED!')
       
       if (validationError instanceof z.ZodError) {
-        console.error('🔴 [BACKEND] Zod errors:', JSON.stringify(validationError.errors, null, 2))
+        console.error('🔴 [BACKEND] Zod issues:', JSON.stringify(validationError.issues, null, 2))
         
         return new Response(
           JSON.stringify({
             error: 'Validacija neuspešna',
-            details: validationError.errors.map(e => ({
+            details: validationError.issues.map(e => ({
               field: e.path.join('.') || 'root',
               message: e.message,
               code: e.code,

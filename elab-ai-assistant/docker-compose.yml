@@ -57,12 +57,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        - RESEND_API_KEY=${RESEND_API_KEY}
-        - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/elab_ai
-        - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-your-super-secret-key-change-this-in-production}
-        - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
-        - NEXT_PUBLIC_APP_URL=${APP_URL:-http://localhost:3000}
     container_name: elab-app
     restart: unless-stopped
     ports:
@@ -78,6 +72,7 @@ services:
       # Email (Resend)
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM: ${EMAIL_FROM:-ELAB AI Assistant <onboarding@resend.dev>}
+      EMAIL_TO_OVERRIDE: ${EMAIL_TO_OVERRIDE}  # ✅ DODATO - za testiranje sa Resend free tier
       
       # App URL
       APP_URL: ${APP_URL:-http://localhost:3000}

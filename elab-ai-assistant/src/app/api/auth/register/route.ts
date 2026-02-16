@@ -12,10 +12,14 @@ export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('🟦 [REGISTER] POST /api/auth/register called')
+    
     const body = await req.json()
+    console.log('🟦 [REGISTER] Body received:', { email: body.email })
 
     // Validacija input-a
     const validatedData = registerSchema.parse(body)
+    console.log('🟦 [REGISTER] Validation passed')
 
     // Proveri da li korisnik već postoji
     const existingUser = await prisma.user.findUnique({
@@ -23,6 +27,7 @@ export async function POST(req: NextRequest) {
     })
 
     if (existingUser) {
+      console.log('🟦 [REGISTER] User already exists:', validatedData.email)
       return NextResponse.json(
         { error: 'Korisnik sa ovom email adresom već postoji' },
         { status: 400 }
@@ -31,10 +36,12 @@ export async function POST(req: NextRequest) {
 
     // Hash lozinke
     const passwordHash = await bcrypt.hash(validatedData.password, 10)
+    console.log('🟦 [REGISTER] Password hashed')
 
     // Generiši verification token
     const verificationToken = randomBytes(32).toString('hex')
     const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
+    console.log('🟦 [REGISTER] Verification token generated:', verificationToken.substring(0, 10) + '...')
 
     // Kreiraj korisnika
     const user = await prisma.user.create({
@@ -56,15 +63,25 @@ export async function POST(req: NextRequest) {
         createdAt: true,
       },
     })
+    console.log('🟦 [REGISTER] User created in database:', user.id)
 
-    // Pošalji verifikacioni email
+    // 🔵 KLJUČNI DEO - Pošalji verifikacioni email
+    console.log('🟦 [REGISTER] Attempting to send verification email...')
+    console.log('🟦 [REGISTER] Environment check:', {
+      RESEND_API_KEY: process.env.RESEND_API_KEY ? '✅ Set' : '❌ Missing',
+      EMAIL_FROM: process.env.EMAIL_FROM || 'Not set',
+      EMAIL_TO_OVERRIDE: process.env.EMAIL_TO_OVERRIDE || 'Not set',
+      APP_URL: process.env.APP_URL || 'Not set',
+      NODE_ENV: process.env.NODE_ENV,
+    })
+    
     const emailResult = await sendVerificationEmail(user.email, verificationToken)
+    console.log('🟦 [REGISTER] Email result:', emailResult)
 
     if (!emailResult.success) {
-      console.error('⚠ Failed to send verification email:', emailResult.error)
+      console.error('⚠ [REGISTER] Failed to send verification email:', emailResult.error)
       
       // Ne blokiraj registraciju ako email ne uspe
-      // Korisnik može kasnije zatražiti novi verifikacioni email
       return NextResponse.json(
         {
           message: 'Registracija uspešna, ali email nije poslat. Kontaktirajte podršku.',
@@ -75,7 +92,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    console.log('✅ User registered and verification email sent:', user.email)
+    console.log('✅ [REGISTER] User registered and verification email sent:', user.email)
 
     // Kreiraj audit log
     await prisma.auditLog.create({
@@ -101,7 +118,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     )
   } catch (error: any) {
-    console.error('Registration error:', error)
+    console.error('❌ [REGISTER] Fatal error:', error)
 
     // Zod validation errors
     if (error.name === 'ZodError') {

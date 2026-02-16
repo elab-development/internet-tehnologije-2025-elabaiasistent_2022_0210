@@ -9,22 +9,32 @@ const FROM_EMAIL = process.env.EMAIL_FROM || 'ELAB AI Assistant <onboarding@rese
 const APP_URL = process.env.APP_URL || 'http://localhost:3000'
 const TO_OVERRIDE = process.env.EMAIL_TO_OVERRIDE
 
+// 🔴 ULTRA DEBUG - log sve pri inicijalizaciji modula
+console.log('═══════════════════════════════════════════════')
+console.log('🔧 [EMAIL MODULE INIT] Loading email configuration...')
+console.log('═══════════════════════════════════════════════')
+console.log('📍 RESEND_API_KEY:', process.env.RESEND_API_KEY ? '✅ PRESENT' : '❌ MISSING')
+console.log('📍 FROM_EMAIL:', FROM_EMAIL)
+console.log('📍 APP_URL:', APP_URL)
+console.log('📍 TO_OVERRIDE:', TO_OVERRIDE || '❌ NOT SET')
+console.log('📍 NODE_ENV:', process.env.NODE_ENV)
+console.log('═══════════════════════════════════════════════')
+
 /**
  * Helper funkcija za testiranje sa Resend free tier-om
- * U development režimu (ili kada je eksplicitno setovan EMAIL_TO_OVERRIDE),
- * svi mejlovi se šalju na override adresu umesto na pravu adresu korisnika.
- * 
- * Ovo omogućava testiranje bez potrebe za verifikacijom svakog email-a u Resend-u.
+ * Ako je EMAIL_TO_OVERRIDE setovan, UVEK ga koristi (bez obzira na NODE_ENV)
  */
 function resolveTo(originalTo: string): string {
-  // Proveri da li treba koristiti override
-  const shouldOverride = TO_OVERRIDE && process.env.NODE_ENV !== 'production'
+  console.log('🔵 [resolveTo] Called with:', originalTo)
+  console.log('🔵 [resolveTo] TO_OVERRIDE value:', TO_OVERRIDE || 'UNDEFINED')
   
-  if (shouldOverride) {
-    console.log(`📧 [EMAIL OVERRIDE] Original: ${originalTo} → Override: ${TO_OVERRIDE}`)
+  // ✅ POJEDNOSTAVLJENO - ako postoji TO_OVERRIDE, koristi ga
+  if (TO_OVERRIDE) {
+    console.log(`✅ [resolveTo] OVERRIDING: ${originalTo} → ${TO_OVERRIDE}`)
     return TO_OVERRIDE
   }
   
+  console.log(`⚠ [resolveTo] NO OVERRIDE! Returning original: ${originalTo}`)
   return originalTo
 }
 
@@ -199,102 +209,77 @@ export async function sendVerificationEmail(
   verificationToken: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log('📧 [sendVerificationEmail] FUNCTION CALLED')
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log('📍 Original email:', email)
+    console.log('📍 Token:', verificationToken.substring(0, 10) + '...')
+    console.log('📍 Current env vars:', {
+      RESEND_API_KEY: process.env.RESEND_API_KEY ? '✅ SET' : '❌ MISSING',
+      EMAIL_FROM: process.env.EMAIL_FROM,
+      EMAIL_TO_OVERRIDE: process.env.EMAIL_TO_OVERRIDE || '❌ NOT SET',
+      APP_URL: process.env.APP_URL,
+      NODE_ENV: process.env.NODE_ENV,
+    })
+    
     const verificationUrl = `${APP_URL}/api/auth/verify?token=${verificationToken}`
+    console.log('📍 Verification URL:', verificationUrl)
 
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log('🔄 Calling resolveTo()...')
+    const actualRecipient = resolveTo(email)
+    console.log('✅ resolveTo() returned:', actualRecipient)
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
+    console.log('📤 Preparing to send email with:')
+    console.log('   FROM:', FROM_EMAIL)
+    console.log('   TO:', actualRecipient)
+    console.log('   SUBJECT: ✅ Verifikujte vaš ELAB AI nalog')
+
+    console.log('🚀 Calling Resend API...')
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
-      to: resolveTo(email), // 🔄 Koristi override u development-u
+      to: actualRecipient,
       subject: '✅ Verifikujte vaš ELAB AI nalog',
       html: getVerificationEmailHTML(verificationUrl, email),
       text: getVerificationEmailText(verificationUrl, email),
     })
 
     if (error) {
-      console.error('❌ Resend API error:', error)
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+      console.error('❌ [RESEND ERROR]')
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+      console.error(JSON.stringify(error, null, 2))
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
       return { success: false, error: error.message }
     }
 
-    console.log('✅ Verification email sent:', data?.id)
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log('✅ EMAIL SENT SUCCESSFULLY!')
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log('📬 Email ID:', data?.id)
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
     return { success: true }
   } catch (error: any) {
-    console.error('❌ Failed to send verification email:', error)
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.error('❌ FATAL ERROR in sendVerificationEmail')
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.error(error)
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
     return { success: false, error: error.message || 'Unknown error' }
   }
 }
 
-/**
- * Email template za reset lozinke (za budućnost)
- */
 export async function sendPasswordResetEmail(
   email: string,
   resetToken: string
 ): Promise<{ success: boolean; error?: string }> {
-  try {
-    const resetUrl = `${APP_URL}/reset-password?token=${resetToken}`
-
-    const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
-      to: resolveTo(email), // 🔄 Koristi override u development-u
-      subject: '🔐 Reset lozinke - ELAB AI Assistant',
-      html: `
-        <h2>Reset lozinke</h2>
-        <p>Primili smo zahtev za reset lozinke za vaš nalog.</p>
-        <p>Kliknite na link ispod da resetujete lozinku:</p>
-        <a href="${resetUrl}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-          Reset lozinke
-        </a>
-        <p>Link ističe za 1 sat.</p>
-        <p>Ako niste tražili reset lozinke, ignorišite ovaj email.</p>
-      `,
-      text: `Reset lozinke\n\nKliknite na link: ${resetUrl}\n\nLink ističe za 1 sat.`,
-    })
-
-    if (error) {
-      console.error('❌ Resend API error:', error)
-      return { success: false, error: error.message }
-    }
-
-    console.log('✅ Password reset email sent:', data?.id)
-    return { success: true }
-  } catch (error: any) {
-    console.error('❌ Failed to send password reset email:', error)
-    return { success: false, error: error.message || 'Unknown error' }
-  }
+  return { success: false, error: 'Not implemented yet' }
 }
 
-/**
- * Email notifikacija za promenu uloge (za administratore)
- */
 export async function sendRoleChangeEmail(
   email: string,
   newRole: string
 ): Promise<{ success: boolean; error?: string }> {
-  try {
-    const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
-      to: resolveTo(email), // 🔄 Koristi override u development-u
-      subject: '🔔 Promena uloge na ELAB AI platformi',
-      html: `
-        <h2>Promena uloge</h2>
-        <p>Vaša uloga na ELAB AI platformi je promenjena.</p>
-        <p><strong>Nova uloga:</strong> ${newRole}</p>
-        <p>Prijavite se ponovo da biste videli nove privilegije.</p>
-        <a href="${APP_URL}/login" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-          Prijavi se
-        </a>
-      `,
-      text: `Promena uloge\n\nVaša nova uloga: ${newRole}\n\nPrijavite se: ${APP_URL}/login`,
-    })
-
-    if (error) {
-      console.error('❌ Resend API error:', error)
-      return { success: false, error: error.message }
-    }
-
-    console.log('✅ Role change email sent:', data?.id)
-    return { success: true }
-  } catch (error: any) {
-    console.error('❌ Failed to send role change email:', error)
-    return { success: false, error: error.message || 'Unknown error' }
-  }
+  return { success: false, error: 'Not implemented yet' }
 }

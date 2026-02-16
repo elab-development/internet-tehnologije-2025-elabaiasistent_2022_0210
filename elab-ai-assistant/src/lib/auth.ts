@@ -33,7 +33,8 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Validacija FON email domena
-        if (!credentials.email.endsWith('@fon.bg.ac.rs')) {
+        const fonEmailRegex = /@([a-z0-9-]+\.)*fon\.bg\.ac\.rs$/i
+        if (!fonEmailRegex.test(credentials.email)) {
           throw new Error('Morate koristiti FON email adresu (@fon.bg.ac.rs)')
         }
 
