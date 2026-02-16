@@ -2,62 +2,80 @@
 
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { UserRole } from '@prisma/client'
+import { addCORSHeaders, createCORSPreflightResponse } from './lib/cors'
+import { addSecurityHeaders } from './lib/security-headers'
+import { createAPILimiter, createGuestLimiter, getClientIP } from './lib/rate-limit'
+
+const apiLimiter = createAPILimiter()
+const guestLimiter = createGuestLimiter()
 
 export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token
     const path = req.nextUrl.pathname
+    const origin = req.headers.get('origin')
 
-    // 🔍 DEBUG LOGOVI
-    console.log('🟨 [MIDDLEWARE] ===== REQUEST =====')
-    console.log('🟨 [MIDDLEWARE] Path:', path)
-    console.log('🟨 [MIDDLEWARE] Method:', req.method)
-    console.log('🟨 [MIDDLEWARE] Token exists:', !!token)
-    console.log('🟨 [MIDDLEWARE] Token role:', token?.role)
-    console.log('🟨 [MIDDLEWARE] Token verified:', token?.verified)
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+      return createCORSPreflightResponse(origin)
+    }
 
-    // Proveri role-based access
+    // Rate limiting za API endpoint-e
+    if (path.startsWith('/api/')) {
+      const clientIP = getClientIP(req.headers)
+      const limiter = token ? apiLimiter : guestLimiter
+      const result = limiter.check(clientIP, path)
+
+      if (!result.allowed) {
+        const response = NextResponse.json(
+          { error: result.message || 'Rate limit exceeded' },
+          { status: 429 }
+        )
+        response.headers.set('X-RateLimit-Limit', String(token ? 100 : 10))
+        response.headers.set('X-RateLimit-Remaining', String(result.remaining))
+        response.headers.set('X-RateLimit-Reset', String(result.resetTime))
+        return addSecurityHeaders(addCORSHeaders(response, origin))
+      }
+    }
+
+    // Role-based access control
     if (path.startsWith('/admin')) {
-      console.log('🟨 [MIDDLEWARE] Admin route check...')
       if (token?.role !== UserRole.ADMIN) {
-        console.log('🔴 [MIDDLEWARE] Unauthorized - redirecting')
         return NextResponse.redirect(new URL('/unauthorized', req.url))
       }
     }
 
     if (path.startsWith('/moderator')) {
-      console.log('🟨 [MIDDLEWARE] Moderator route check...')
       if (token?.role !== UserRole.MODERATOR && token?.role !== UserRole.ADMIN) {
-        console.log('🔴 [MIDDLEWARE] Unauthorized - redirecting')
         return NextResponse.redirect(new URL('/unauthorized', req.url))
       }
-      console.log('🟨 [MIDDLEWARE] ✅ Moderator access granted')
     }
 
-    // Proveri verifikaciju
+    // Email verification check
     if (path.startsWith('/chat') || path.startsWith('/dashboard')) {
-      console.log('🟨 [MIDDLEWARE] Verification check...')
       if (!token?.verified) {
-        console.log('🔴 [MIDDLEWARE] Not verified - redirecting')
         return NextResponse.redirect(new URL('/verify-email-required', req.url))
       }
     }
 
-    console.log('🟨 [MIDDLEWARE] ✅ Passing through to route handler')
-    return NextResponse.next()
+    // Create response
+    const response = NextResponse.next()
+
+    // Add security headers
+    addSecurityHeaders(response)
+    addCORSHeaders(response, origin)
+
+    return response
   },
   {
     callbacks: {
-      authorized: ({ token }) => {
-        console.log('🟨 [MIDDLEWARE] authorized callback - token exists:', !!token)
-        return !!token
-      },
+      authorized: ({ token }) => !!token,
     },
   }
 )
 
-// Definiši koje rute su zaštićene
 export const config = {
   matcher: [
     '/dashboard/:path*',

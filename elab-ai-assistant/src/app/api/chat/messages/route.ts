@@ -7,6 +7,7 @@ import { sendMessageSchema } from '@/lib/validations/chat'
 import { getVectorDB } from '@/lib/vector-db'
 import { getOllamaClient } from '@/lib/ollama'
 import { errorResponse, successResponse, ApiError } from '@/lib/api-response'
+import { sanitizeChatMessage, validateUserInput } from '@/lib/sanitize'
 
 /**
  * POST /api/chat/messages
@@ -18,6 +19,18 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     
     const validatedData = sendMessageSchema.parse(body)
+
+    // Sanitizuj user input (XSS protection)
+    const sanitizedContent = sanitizeChatMessage(validatedData.content)
+    
+    // Dodatna validacija
+    const validation = validateUserInput(sanitizedContent)
+    if (!validation.valid) {
+      throw new ApiError(
+        `Nevalidan input: ${validation.errors.join(', ')}`,
+        400
+      )
+    }
 
     // Proveri da li konverzacija pripada korisniku
     const conversation = await prisma.conversation.findUnique({
@@ -40,20 +53,20 @@ export async function POST(req: NextRequest) {
 
     const startTime = Date.now()
 
-    // 1. Kreiraj korisničku poruku
+    // 1. Kreiraj korisničku poruku (koristi sanitizovan sadržaj)
     const userMessage = await prisma.message.create({
       data: {
         conversationId: validatedData.conversationId,
         role: 'USER',
-        content: validatedData.content,
+        content: validation.sanitized,
       },
     })
 
-    console.log('💬 User message:', validatedData.content)
+    console.log('💬 User message:', validation.sanitized)
 
     // 2. Pretraži vektorsku bazu za relevantne kontekste
     const vectorDB = await getVectorDB()
-    const searchResults = await vectorDB.search(validatedData.content, {
+    const searchResults = await vectorDB.search(validation.sanitized, {
       limit: 5,
       minRelevance: 0.3,
     })
@@ -89,7 +102,7 @@ export async function POST(req: NextRequest) {
       }
 
       const ragResponse = await ollamaClient.generateRAGResponse(
-        validatedData.content,
+        validation.sanitized,
         contexts,
         conversationHistory
       )
@@ -103,7 +116,7 @@ export async function POST(req: NextRequest) {
       console.error('❌ Ollama error:', ollamaError.message)
 
       // Fallback na mock odgovor ako Ollama ne radi
-      aiResponse = generateFallbackResponse(validatedData.content, contexts)
+      aiResponse = generateFallbackResponse(validation.sanitized, contexts)
       sources = contexts.map(ctx => ({
         url: ctx.url,
         title: ctx.title,
