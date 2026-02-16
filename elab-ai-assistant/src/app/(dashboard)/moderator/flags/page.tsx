@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Card, { CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -36,7 +36,10 @@ interface FlagItem {
   } | null
 }
 
-export default function ModeratorFlagsPage() {
+// ============================================
+// 🔹 KOMPONENTA SA useSearchParams LOGIKOM
+// ============================================
+function FlagsContent() {
   const searchParams = useSearchParams()
   const conversationId = searchParams.get('conversationId')
 
@@ -403,5 +406,58 @@ export default function ModeratorFlagsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+// ============================================
+// 🔹 LOADING FALLBACK
+// ============================================
+function FlagsLoadingFallback() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="h-8 bg-gray-200 rounded w-32 mb-2 animate-pulse"></div>
+          <div className="h-4 bg-gray-200 rounded w-64 animate-pulse"></div>
+        </div>
+        <div className="h-10 bg-gray-200 rounded w-32 animate-pulse"></div>
+      </div>
+
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <Card key={i}>
+            <CardContent className="py-4">
+              <div className="animate-pulse space-y-3">
+                <div className="flex items-center space-x-2">
+                  <div className="h-6 bg-gray-200 rounded w-32"></div>
+                  <div className="h-6 bg-gray-200 rounded w-20"></div>
+                  <div className="h-6 bg-gray-200 rounded w-20"></div>
+                </div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="grid grid-cols-4 gap-4">
+                  {[1, 2, 3, 4].map((j) => (
+                    <div key={j}>
+                      <div className="h-3 bg-gray-200 rounded w-16 mb-1"></div>
+                      <div className="h-4 bg-gray-200 rounded w-24"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// 🔹 GLAVNA KOMPONENTA SA SUSPENSE
+// ============================================
+export default function ModeratorFlagsPage() {
+  return (
+    <Suspense fallback={<FlagsLoadingFallback />}>
+      <FlagsContent />
+    </Suspense>
   )
 }
