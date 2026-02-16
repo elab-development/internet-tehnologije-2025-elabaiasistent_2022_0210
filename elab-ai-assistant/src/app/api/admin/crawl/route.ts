@@ -2,6 +2,7 @@
 
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client' // ✅ DODAJ OVO
 import { requireAdmin } from '@/lib/auth-helpers'
 import { WebCrawler } from '@/lib/crawler'
 import { TextChunker } from '@/lib/text-chunker'
@@ -138,7 +139,7 @@ async function crawlDocuments(sources: any[], crawlJobId: string) {
       }
     }
 
-    // Ažuriraj crawl job
+    // ✅ PROMENJENO: Koristi Prisma.JsonNull umesto null
     await prisma.crawlJob.update({
       where: { id: crawlJobId },
       data: {
@@ -149,7 +150,7 @@ async function crawlDocuments(sources: any[], crawlJobId: string) {
           totalChunks,
           sources: sources.length,
         },
-        errors: errors.length > 0 ? errors : null,
+        errors: errors.length > 0 ? errors : Prisma.JsonNull, // ✅ ISPRAVLJENO
       },
     })
 
@@ -157,12 +158,13 @@ async function crawlDocuments(sources: any[], crawlJobId: string) {
   } catch (error: any) {
     console.error('❌ Crawl job error:', error)
 
+    // ✅ PROMENJENO: Koristi Prisma.JsonArray tip
     await prisma.crawlJob.update({
       where: { id: crawlJobId },
       data: {
         status: 'FAILED',
         completedAt: new Date(),
-        errors: [error.message],
+        errors: [error.message] as Prisma.JsonArray, // ✅ ISPRAVLJENO
       },
     })
   }

@@ -4,6 +4,8 @@ import { NextRequest } from 'next/server'
 import { getVectorDB } from '@/lib/vector-db'
 import { errorResponse, successResponse, ApiError } from '@/lib/api-response'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/search?q=query&limit=5&sourceType=ELAB_MAIN
  * Semantic search kroz indeksirane dokumente

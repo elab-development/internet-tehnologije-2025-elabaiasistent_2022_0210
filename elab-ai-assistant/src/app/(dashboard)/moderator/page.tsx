@@ -16,6 +16,7 @@ export default function ModeratorPage() {
     openTickets: 0,
     totalFAQs: 0,
     resolvedToday: 0,
+    totalConversations: 0
   })
   const [isLoading, setIsLoading] = useState(true)
 
@@ -31,6 +32,7 @@ export default function ModeratorPage() {
         openTickets: 2,
         totalFAQs: 12,
         resolvedToday: 5,
+        totalConversations: 8
       })
     } catch (error) {
       console.error('Error fetching stats:', error)
@@ -101,6 +103,22 @@ export default function ModeratorPage() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Link href="/moderator/conversations">
+          <Card hover className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                Konverzacije
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600 text-sm mb-4">
+                Pregledajte sve korisničke konverzacije i moderišite sadržaj
+              </p>
+              <Badge variant="info">{stats.totalConversations || 0} ukupno</Badge>
+            </CardContent>
+          </Card>
+        </Link>
+
         <Link href="/moderator/flags">
           <Card hover className="h-full">
             <CardHeader>
@@ -152,6 +170,7 @@ export default function ModeratorPage() {
           </Card>
         </Link>
       </div>
+
     </div>
   )
 }
