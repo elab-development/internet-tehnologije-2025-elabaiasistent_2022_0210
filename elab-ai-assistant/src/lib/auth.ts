@@ -6,6 +6,9 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { prisma } from './prisma'
 import bcrypt from 'bcryptjs'
 import { UserRole } from '@prisma/client'
+import { createLoginLimiter } from './rate-limit'
+
+const loginLimiter = createLoginLimiter()
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -16,13 +19,22 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email', placeholder: 'student@fon.bg.ac.rs' },
         password: { label: 'Lozinka', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Email i lozinka su obavezni')
         }
 
-        // Validacija FON email domena (FZ-1)
-        if (!credentials.email.endsWith('@fon.bg.ac.rs') && !credentials.email.endsWith('@student.fon.bg.ac.rs')){
+        // Rate limiting (brute force protection)
+        const clientIP = req?.headers?.['x-forwarded-for'] || 'unknown'
+        const rateLimitResult = loginLimiter.check(clientIP as string, 'login')
+
+        if (!rateLimitResult.allowed) {
+          throw new Error(rateLimitResult.message || 'Previše pokušaja prijavljivanja')
+        }
+
+        // Validacija FON email domena
+        const fonEmailRegex = /@([a-z0-9-]+\.)*fon\.bg\.ac\.rs$/i
+        if (!fonEmailRegex.test(credentials.email)) {
           throw new Error('Morate koristiti FON email adresu (@fon.bg.ac.rs)')
         }
 
@@ -50,13 +62,15 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Neispravni kredencijali')
         }
 
+        // Uspešan login - resetuj rate limit
+        loginLimiter.reset(clientIP as string, 'login')
+
         // Ažuriraj lastLogin
         await prisma.user.update({
           where: { id: user.id },
           data: { lastLogin: new Date() },
         })
 
-        // Vrati korisnika (bez passwordHash)
         return {
           id: user.id,
           email: user.email,
@@ -69,7 +83,6 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // Dodaj custom polja u JWT token
       if (user) {
         token.id = user.id
         token.role = user.role
@@ -79,7 +92,6 @@ export const authOptions: NextAuthOptions = {
       return token
     },
     async session({ session, token }) {
-      // Dodaj custom polja u session
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as UserRole

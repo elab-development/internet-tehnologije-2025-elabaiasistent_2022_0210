@@ -57,12 +57,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        - RESEND_API_KEY=${RESEND_API_KEY}
-        - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/elab_ai
-        - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-your-super-secret-key-change-this-in-production}
-        - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
-        - NEXT_PUBLIC_APP_URL=${APP_URL:-http://localhost:3000}
     container_name: elab-app
     restart: unless-stopped
     ports:
@@ -78,6 +72,7 @@ services:
       # Email (Resend)
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM: ${EMAIL_FROM:-ELAB AI Assistant <onboarding@resend.dev>}
+      EMAIL_TO_OVERRIDE: ${EMAIL_TO_OVERRIDE}  # ✅ DODATO - za testiranje sa Resend free tier
       
       # App URL
       APP_URL: ${APP_URL:-http://localhost:3000}
@@ -85,7 +80,11 @@ services:
       
       # ChromaDB
       CHROMA_URL: ${CHROMA_URL:-http://chromadb:8000}
-      
+
+      # Ollama LLM
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+
       # Node environment
       NODE_ENV: production
     depends_on:
@@ -93,6 +92,8 @@ services:
         condition: service_healthy
       chromadb:
         condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - elab-network
     command: >
@@ -105,6 +106,28 @@ services:
         node server.js
       "
 
+  # ============================================
+  # Ollama LLM Service
+  # ============================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: elab-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - elab-network
+    # GPU support (opciono - zahteva nvidia-docker)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
 # ============================================
 # Volumes
 # ============================================
@@ -113,6 +136,8 @@ volumes:
     driver: local
   chroma_data:
     driver: local
+  ollama_data:
+    driver: local
 
 # ============================================
 # Networks
@@ -120,25 +145,3 @@ volumes:
 networks:
   elab-network:
     driver: bridge
-
-  # ============================================
-  # Ollama LLM Service (opciono - za production)
-  # ============================================
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   container_name: elab-ollama
-  #   restart: unless-stopped
-  #   ports:
-  #     - "11434:11434"
-  #   volumes:
-  #     - ollama_data:/root/.ollama
-  #   networks:
-  #     - elab-network
-  #   # GPU support (zahteva nvidia-docker)
-  #   # deploy:
-  #   #   resources:
-  #   #     reservations:
-  #   #       devices:
-  #   #         - driver: nvidia
-  #   #           count: 1
-  #   #           capabilities: [gpu]

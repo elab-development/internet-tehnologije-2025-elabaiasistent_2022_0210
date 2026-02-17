@@ -1,0 +1,56 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+tests/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+coverage/
+playwright-report/
+test-results/
+
+# Build
+.next/
+out/
+build/
+dist/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+docker-start.*
+.dockerignore
+
+# Environment
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.docker
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Misc
+*.md
+!README.md
+chroma-config.yaml
+scripts/test-*.ts

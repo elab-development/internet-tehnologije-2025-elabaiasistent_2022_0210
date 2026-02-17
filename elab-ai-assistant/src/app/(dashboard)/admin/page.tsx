@@ -5,24 +5,35 @@
 import { useEffect, useState } from 'react'
 import Card, { CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import Spinner from '@/components/ui/Spinner'
-import { Users, Database, TrendingUp, Activity } from 'lucide-react'
+import LineChart from '@/components/charts/LineChart'
+import BarChart from '@/components/charts/BarChart'
+import DoughnutChart from '@/components/charts/DoughnutChart'
+import { Users, Database, TrendingUp, Activity, Cloud, Thermometer } from 'lucide-react'
 import Link from 'next/link'
 
 export default function AdminPage() {
   const [stats, setStats] = useState<any>(null)
+  const [weather, setWeather] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    fetchStatistics()
+    fetchData()
   }, [])
 
-  const fetchStatistics = async () => {
+  const fetchData = async () => {
     try {
-      const response = await fetch('/api/admin/statistics')
-      const data = await response.json()
-      setStats(data)
+      const [statsRes, weatherRes] = await Promise.all([
+        fetch('/api/admin/statistics'),
+        fetch('/api/weather'),
+      ])
+
+      const statsData = await statsRes.json()
+      const weatherData = await weatherRes.json()
+
+      setStats(statsData)
+      setWeather(weatherData.configured ? weatherData.weather : null)
     } catch (error) {
-      console.error('Error fetching statistics:', error)
+      console.error('Error fetching data:', error)
     } finally {
       setIsLoading(false)
     }
@@ -36,6 +47,17 @@ export default function AdminPage() {
     )
   }
 
+  // Pripremi podatke za grafikone
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date()
+    date.setDate(date.getDate() - (6 - i))
+    return date.toLocaleDateString('sr-RS', { day: '2-digit', month: '2-digit' })
+  })
+
+  // Mock podaci za demo (u produkciji bi došli iz baze)
+  const messagesPerDay = [12, 18, 15, 22, 28, 25, 30]
+  const usersPerDay = [2, 3, 1, 4, 2, 3, 5]
+
   return (
     <div className="space-y-6">
       <div>
@@ -44,6 +66,39 @@ export default function AdminPage() {
           Pregled sistema i upravljanje korisnicima
         </p>
       </div>
+
+      {/* Weather Widget (External API #2) */}
+      {weather && (
+        <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Cloud className="h-12 w-12" />
+                <div>
+                  <h3 className="text-2xl font-bold">
+                    {weather.city}, {weather.country}
+                  </h3>
+                  <p className="text-blue-100 capitalize">{weather.description}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="flex items-center space-x-2">
+                  <Thermometer className="h-8 w-8" />
+                  <span className="text-5xl font-bold">{weather.temperature}°C</span>
+                </div>
+                <p className="text-blue-100 text-sm mt-1">
+                  Oseća se kao {weather.feelsLike}°C
+                </p>
+              </div>
+              <div className="text-sm text-blue-100">
+                <p>💧 Vlažnost: {weather.humidity}%</p>
+                <p>🌬 Vetar: {weather.windSpeed} m/s</p>
+                <p>🔽 Pritisak: {weather.pressure} hPa</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -96,6 +151,57 @@ export default function AdminPage() {
         </Card>
       </div>
 
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <LineChart
+              title="Poruke po danima (poslednja nedelja)"
+              labels={last7Days}
+              data={messagesPerDay}
+              label="Broj poruka"
+              color="rgb(59, 130, 246)"
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <BarChart
+              title="Novi korisnici po danima"
+              labels={last7Days}
+              data={usersPerDay}
+              label="Novi korisnici"
+              color="rgb(34, 197, 94)"
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <DoughnutChart
+              title="Korisnici po ulogama"
+              labels={stats?.usersByRole?.map((r: any) => r.role) || []}
+              data={stats?.usersByRole?.map((r: any) => r._count) || []}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <DoughnutChart
+              title="Ocenjivanje odgovora"
+              labels={['Pozitivne', 'Negativne']}
+              data={[
+                stats?.overview?.positiveRatings || 0,
+                stats?.overview?.negativeRatings || 0,
+              ]}
+              colors={['rgb(34, 197, 94)', 'rgb(239, 68, 68)']}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Quick Links */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link href="/admin/users">
@@ -124,38 +230,19 @@ export default function AdminPage() {
           </Card>
         </Link>
 
-        <Link href="/admin/logs">
+        <Link href="/admin/crawl">
           <Card hover className="h-full">
             <CardHeader>
-              <CardTitle>Sistemski logovi</CardTitle>
+              <CardTitle>Crawl Job-ovi</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-gray-600 text-sm">
-                Pregledajte audit trail i sistemske greške
+                Pokrenite indeksiranje i pratite status job-ova
               </p>
             </CardContent>
           </Card>
         </Link>
       </div>
-
-      {/* Users by Role */}
-      {stats?.usersByRole && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Korisnici po ulogama</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {stats.usersByRole.map((item: any) => (
-                <div key={item.role} className="flex items-center justify-between">
-                  <span className="text-gray-700 font-medium">{item.role}</span>
-                  <span className="text-2xl font-bold text-gray-900">{item.count}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }
