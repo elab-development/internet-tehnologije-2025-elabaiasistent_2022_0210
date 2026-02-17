@@ -5,8 +5,19 @@ if (typeof window !== 'undefined') {
   throw new Error('VectorDB can only be used on the server side')
 }
 
-import { ChromaClient, Collection } from 'chromadb'
+import { ChromaClient, Collection, IEmbeddingFunction } from 'chromadb'
 import { OllamaEmbedding } from './embeddings'
+
+/**
+ * Custom embedding function wrapper for ChromaDB
+ * Since we generate embeddings externally with Ollama, this is a no-op
+ */
+class CustomEmbeddingFunction implements IEmbeddingFunction {
+  async generate(texts: string[]): Promise<number[][]> {
+    // Return empty arrays - we provide embeddings externally
+    return texts.map(() => [])
+  }
+}
 
 const CHROMA_URL = process.env.CHROMA_URL || 'http://localhost:8000'
 const COLLECTION_NAME = 'elab_documents'
@@ -58,6 +69,7 @@ export class VectorDB {
   private client: ChromaClient
   private collection: Collection | null = null
   private embeddingService: OllamaEmbedding
+  private embeddingFunction: CustomEmbeddingFunction
 
   constructor() {
     this.client = new ChromaClient({ path: CHROMA_URL })
@@ -66,6 +78,7 @@ export class VectorDB {
       process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
       'nomic-embed-text'
     )
+    this.embeddingFunction = new CustomEmbeddingFunction()
   }
 
   /**
@@ -75,12 +88,14 @@ export class VectorDB {
       try {
         this.collection = await this.client.getCollection({
           name: COLLECTION_NAME,
+          embeddingFunction: this.embeddingFunction,
         })
         console.log(`✅ ChromaDB collection loaded: ${COLLECTION_NAME}`)
       } catch {
         this.collection = await this.client.createCollection({
           name: COLLECTION_NAME,
-          metadata: { 
+          embeddingFunction: this.embeddingFunction,
+          metadata: {
             description: 'ELAB AI Assistant document embeddings',
             'hnsw:space': 'cosine'  // ← ovo je ključna izmena
           },

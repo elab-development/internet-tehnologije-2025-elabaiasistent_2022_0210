@@ -80,7 +80,11 @@ services:
       
       # ChromaDB
       CHROMA_URL: ${CHROMA_URL:-http://chromadb:8000}
-      
+
+      # Ollama LLM
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+
       # Node environment
       NODE_ENV: production
     depends_on:
@@ -88,6 +92,8 @@ services:
         condition: service_healthy
       chromadb:
         condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - elab-network
     command: >
@@ -100,6 +106,28 @@ services:
         node server.js
       "
 
+  # ============================================
+  # Ollama LLM Service
+  # ============================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: elab-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - elab-network
+    # GPU support (opciono - zahteva nvidia-docker)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
 # ============================================
 # Volumes
 # ============================================
@@ -108,6 +136,8 @@ volumes:
     driver: local
   chroma_data:
     driver: local
+  ollama_data:
+    driver: local
 
 # ============================================
 # Networks
@@ -115,25 +145,3 @@ volumes:
 networks:
   elab-network:
     driver: bridge
-
-  # ============================================
-  # Ollama LLM Service (opciono - za production)
-  # ============================================
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   container_name: elab-ollama
-  #   restart: unless-stopped
-  #   ports:
-  #     - "11434:11434"
-  #   volumes:
-  #     - ollama_data:/root/.ollama
-  #   networks:
-  #     - elab-network
-  #   # GPU support (zahteva nvidia-docker)
-  #   # deploy:
-  #   #   resources:
-  #   #     reservations:
-  #   #       devices:
-  #   #         - driver: nvidia
-  #   #           count: 1
-  #   #           capabilities: [gpu]
