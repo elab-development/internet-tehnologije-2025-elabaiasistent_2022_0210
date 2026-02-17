@@ -26,14 +26,14 @@ export default function ModeratorPage() {
 
   const fetchStats = async () => {
     try {
-      // Mock data for now
-      setStats({
-        pendingFlags: 3,
-        openTickets: 2,
-        totalFAQs: 12,
-        resolvedToday: 5,
-        totalConversations: 8
-      })
+      const response = await fetch('/api/moderator/stats')
+      const data = await response.json()
+
+      if (response.ok && data.stats) {
+        setStats(data.stats)
+      } else {
+        console.error('Error fetching stats:', data.error)
+      }
     } catch (error) {
       console.error('Error fetching stats:', error)
     } finally {
