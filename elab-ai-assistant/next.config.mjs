@@ -2,8 +2,10 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-  
+  // Note: 'standalone' output is for Docker. Vercel handles this automatically.
+  // Uncomment the line below if deploying with Docker instead of Vercel:
+  // output: 'standalone',
+
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',
