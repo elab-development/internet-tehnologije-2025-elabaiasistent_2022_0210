@@ -6,7 +6,7 @@ if (typeof window !== 'undefined') {
 }
 
 import { ChromaClient, Collection } from 'chromadb'
-import { SimpleEmbedding } from './embeddings'
+import { OllamaEmbedding } from './embeddings'
 
 const CHROMA_URL = process.env.CHROMA_URL || 'http://localhost:8000'
 const COLLECTION_NAME = 'elab_documents'
@@ -40,36 +40,54 @@ export interface SearchResult {
 
 /**
  * Vector Database Service (ChromaDB wrapper)
+ * 
+ * FIX: Zamenjen SimpleEmbedding (TF-IDF) sa OllamaEmbedding.
+ * 
+ * Problem sa SimpleEmbedding:
+ * - TF-IDF model mora biti treniran na svim dokumentima pre upotrebe
+ * - Trening se čuvao samo u memoriji (in-memory Map)
+ * - Svaki restart servera resetuje singleton → prazan rečnik → embed() vraća []
+ * - ChromaDB odbija prazan embedding niz → "Interna greška servera"
+ * 
+ * Zašto OllamaEmbedding rešava problem:
+ * - Ollama generiše embedding na osnovu natrenirane neuronske mreže
+ * - Nema in-memory stanja koje se gubi pri restartu
+ * - Isti model garantuje konzistentne vektore i pri indexiranju i pri pretrazi
  */
 export class VectorDB {
   private client: ChromaClient
   private collection: Collection | null = null
-  private embeddingService: SimpleEmbedding
+  private embeddingService: OllamaEmbedding
 
   constructor() {
     this.client = new ChromaClient({ path: CHROMA_URL })
-    this.embeddingService = new SimpleEmbedding()
+    // Koristimo nomic-embed-text — pull sa: ollama pull nomic-embed-text
+    this.embeddingService = new OllamaEmbedding(
+      process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+      'nomic-embed-text'
+    )
   }
 
   /**
    * Inicijalizuje kolekciju
    */
-  async initialize() {
-    try {
-      // Pokušaj da učitaš postojeću kolekciju
-      this.collection = await this.client.getCollection({
-        name: COLLECTION_NAME,
-      })
-      console.log(`✅ ChromaDB collection loaded: ${COLLECTION_NAME}`)
-    } catch {
-      // Ako ne postoji, kreiraj novu
-      this.collection = await this.client.createCollection({
-        name: COLLECTION_NAME,
-        metadata: { description: 'ELAB AI Assistant document embeddings' },
-      })
-      console.log(`✅ ChromaDB collection created: ${COLLECTION_NAME}`)
+    async initialize() {
+      try {
+        this.collection = await this.client.getCollection({
+          name: COLLECTION_NAME,
+        })
+        console.log(`✅ ChromaDB collection loaded: ${COLLECTION_NAME}`)
+      } catch {
+        this.collection = await this.client.createCollection({
+          name: COLLECTION_NAME,
+          metadata: { 
+            description: 'ELAB AI Assistant document embeddings',
+            'hnsw:space': 'cosine'  // ← ovo je ključna izmena
+          },
+        })
+        console.log(`✅ ChromaDB collection created: ${COLLECTION_NAME}`)
+      }
     }
-  }
 
   /**
    * Dodaje dokumente u vektorsku bazu
@@ -83,7 +101,6 @@ export class VectorDB {
 
     console.log(`📥 Adding ${documents.length} documents to ChromaDB...`)
 
-    // Pripremi podatke za ChromaDB
     const ids = documents.map(doc => doc.id)
     const contents = documents.map(doc => doc.content)
     const metadatas = documents.map(doc => ({
@@ -94,17 +111,10 @@ export class VectorDB {
       crawledAt: doc.metadata.crawledAt,
     }))
 
-    // Generiši embeddings
-    console.log('🔄 Generating embeddings...')
-    
-    // Treniraj embedding model na svim dokumentima (za TF-IDF)
-    this.embeddingService.train(contents)
-    
-    const embeddings = contents.map(content => 
-      this.embeddingService.embed(content)
-    )
+    // Generiši embeddings koristeći Ollama (batch)
+    console.log('🔄 Generating embeddings via Ollama...')
+    const embeddings = await this.embeddingService.embedBatch(contents)
 
-    // Dodaj u ChromaDB
     await this.collection.add({
       ids,
       embeddings,
@@ -134,28 +144,30 @@ export class VectorDB {
 
     console.log(`🔍 Searching for: "${query}"`)
 
-    // Generiši embedding za query
-    const queryEmbedding = this.embeddingService.embed(query)
+    // Generiši embedding za query — sada uvek radi, nema in-memory zavisnosti
+    const queryEmbedding = await this.embeddingService.embed(query)
 
-    // Pripremi filter
     const where = sourceType ? { sourceType } : undefined
 
-    // Pretraži ChromaDB
     const results = await this.collection.query({
       queryEmbeddings: [queryEmbedding],
       nResults: limit,
       where,
     })
 
-    // Formatiraj rezultate
+    // 🔴 PRIVREMENI DEBUG 
+console.log('RAW IDs:', results.ids)
+console.log('RAW distances:', results.distances)
+console.log('RAW documents preview:', results.documents?.[0]?.[0]?.slice(0, 100))
+
     const searchResults: SearchResult[] = []
 
     if (results.ids && results.ids[0]) {
       for (let i = 0; i < results.ids[0].length; i++) {
         const distance = results.distances?.[0]?.[i] || 1
-        const relevanceScore = 1 - distance // Konvertuj distance u similarity
+        const relevanceScore = 1 / (1 + distance)
 
-        // Filtriraj po minimalnoj relevantnosti
+
         if (relevanceScore >= minRelevance) {
           searchResults.push({
             id: results.ids[0][i],
@@ -194,9 +206,7 @@ export class VectorDB {
    */
   async count(): Promise<number> {
     if (!this.collection) return 0
-
-    const result = await this.collection.count()
-    return result
+    return await this.collection.count()
   }
 
   /**
@@ -204,7 +214,6 @@ export class VectorDB {
    */
   async getStats() {
     const count = await this.count()
-
     return {
       collectionName: COLLECTION_NAME,
       totalDocuments: count,

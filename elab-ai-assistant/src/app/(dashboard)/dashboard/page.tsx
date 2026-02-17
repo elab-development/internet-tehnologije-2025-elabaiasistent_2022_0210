@@ -8,7 +8,8 @@ import Card, { CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Spinner from '@/components/ui/Spinner'
-import { MessageSquare, TrendingUp, ThumbsUp, Clock } from 'lucide-react'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import { MessageSquare, TrendingUp, ThumbsUp, Clock, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
 interface Conversation {
@@ -28,6 +29,8 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null)
 
   useEffect(() => {
     fetchConversations()
@@ -51,6 +54,32 @@ export default function DashboardPage() {
       month: 'short',
       year: 'numeric',
     })
+  }
+
+  const handleDeleteClick = (convId: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setConversationToDelete(convId)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!conversationToDelete) return
+
+    try {
+      const response = await fetch(`/api/chat/conversations/${conversationToDelete}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        // Ukloni konverzaciju iz liste
+        setConversations(prev => prev.filter(c => c.id !== conversationToDelete))
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error)
+    } finally {
+      setConversationToDelete(null)
+    }
   }
 
   return (
@@ -139,29 +168,50 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-3">
               {conversations.slice(0, 5).map((conv) => (
-                <Link key={conv.id} href={`/chat/${conv.id}`}>
-                  <div className="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer">
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-medium text-gray-900">{conv.title}</h4>
-                      <Badge variant="default" size="sm">
-                        {conv.messageCount} poruka
-                      </Badge>
-                    </div>
-                    {conv.lastMessage && (
-                      <p className="text-sm text-gray-600 line-clamp-2">
-                        {conv.lastMessage.content}
+                <div key={conv.id} className="relative group">
+                  <Link href={`/chat/${conv.id}`}>
+                    <div className="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer">
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-medium text-gray-900 pr-8">{conv.title}</h4>
+                        <Badge variant="default" size="sm">
+                          {conv.messageCount} poruka
+                        </Badge>
+                      </div>
+                      {conv.lastMessage && (
+                        <p className="text-sm text-gray-600 line-clamp-2">
+                          {conv.lastMessage.content}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-2">
+                        {formatDate(conv.updatedAt)}
                       </p>
-                    )}
-                    <p className="text-xs text-gray-500 mt-2">
-                      {formatDate(conv.updatedAt)}
-                    </p>
-                  </div>
-                </Link>
+                    </div>
+                  </Link>
+                  <button
+                    onClick={(e) => handleDeleteClick(conv.id, e)}
+                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-100 rounded"
+                    title="Obriši konverzaciju"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-600" />
+                  </button>
+                </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Obriši konverzaciju"
+        message="Da li ste sigurni da želite da obrišete ovu konverzaciju? Ova akcija se ne može poništiti."
+        confirmText="Obriši"
+        cancelText="Otkaži"
+        variant="danger"
+      />
     </div>
   )
 }

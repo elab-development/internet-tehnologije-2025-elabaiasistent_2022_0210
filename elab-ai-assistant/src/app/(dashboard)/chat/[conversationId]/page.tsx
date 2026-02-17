@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import ChatMessage from '@/components/chat/ChatMessage'
 import ChatInput from '@/components/chat/ChatInput'
 import Button from '@/components/ui/Button'
 import Spinner from '@/components/ui/Spinner'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
-import { Plus, MessageSquare, Trash2 } from 'lucide-react'
+import { Plus, MessageSquare, ArrowLeft, Trash2 } from 'lucide-react'
+import Link from 'next/link'
 
 interface Message {
   id: string
@@ -24,8 +25,11 @@ interface Conversation {
   messages: Message[]
 }
 
-export default function ChatPage() {
+export default function ConversationPage() {
+  const params = useParams()
   const router = useRouter()
+  const conversationId = params.conversationId as string
+
   const [conversations, setConversations] = useState<any[]>([])
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -37,6 +41,12 @@ export default function ChatPage() {
   useEffect(() => {
     fetchConversations()
   }, [])
+
+  useEffect(() => {
+    if (conversationId && conversations.length > 0) {
+      loadConversation(conversationId)
+    }
+  }, [conversationId, conversations])
 
   useEffect(() => {
     scrollToBottom()
@@ -51,10 +61,6 @@ export default function ChatPage() {
       const response = await fetch('/api/chat/conversations')
       const data = await response.json()
       setConversations(data.conversations || [])
-
-      if (data.conversations?.length > 0) {
-        loadConversation(data.conversations[0].id)
-      }
     } catch (error) {
       console.error('Error fetching conversations:', error)
     } finally {
@@ -62,18 +68,17 @@ export default function ChatPage() {
     }
   }
 
-  const loadConversation = async (conversationId: string) => {
+  const loadConversation = async (convId: string) => {
     try {
-      const response = await fetch(`/api/chat/conversations/${conversationId}`)
+      const response = await fetch(`/api/chat/conversations/${convId}`)
       const data = await response.json()
       setActiveConversation(data.conversation)
     } catch (error) {
       console.error('Error loading conversation:', error)
+      router.push('/chat')
     }
   }
 
-  // FIX #1: Funkcija sada vraća id novokreirane konverzacije direktno,
-  // umesto da se oslanjamo na React state koji se ne ažurira odmah.
   const createNewConversation = async (): Promise<string | null> => {
     try {
       const response = await fetch('/api/chat/conversations', {
@@ -84,7 +89,7 @@ export default function ChatPage() {
       const data = await response.json()
 
       setConversations(prev => [data.conversation, ...prev])
-      setActiveConversation({ ...data.conversation, messages: [] })
+      router.push(`/chat/${data.conversation.id}`)
 
       return data.conversation.id
     } catch (error) {
@@ -94,16 +99,7 @@ export default function ChatPage() {
   }
 
   const sendMessage = async (content: string) => {
-    // FIX #1: Koristimo id direktno iz return vrednosti, ne iz state-a.
-    // Pre fixa, activeConversation?.id je bio uvek undefined ovde zbog
-    // toga što React state update nije sinhroni — closure je "zaključao"
-    // staru null vrednost.
-    let conversationId = activeConversation?.id
-
-    if (!conversationId) {
-      conversationId = await createNewConversation() ?? undefined
-      if (!conversationId) return
-    }
+    if (!conversationId) return
 
     setIsSending(true)
 
@@ -116,9 +112,6 @@ export default function ChatPage() {
 
       const data = await response.json()
 
-      // FIX #2: Proveravamo da li su userMessage i aiMessage stvarno prisutni
-      // pre nego što ih dodamo u niz. Bez ovoga, undefined vrednosti bi ušle
-      // u niz i prouzrokovale crash na message.id u renderu.
       if (!data.userMessage || !data.aiMessage) {
         console.error('API nije vratio očekivane poruke:', data)
         return
@@ -140,6 +133,9 @@ export default function ChatPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title }),
         })
+
+        // Osveži listu konverzacija da prikaže novi naslov
+        fetchConversations()
       }
     } catch (error) {
       console.error('Error sending message:', error)
@@ -173,6 +169,7 @@ export default function ChatPage() {
   }
 
   const handleDeleteClick = (convId: string, e: React.MouseEvent) => {
+    e.preventDefault()
     e.stopPropagation()
     setConversationToDelete(convId)
     setDeleteDialogOpen(true)
@@ -190,14 +187,9 @@ export default function ChatPage() {
         // Ukloni konverzaciju iz liste
         setConversations(prev => prev.filter(c => c.id !== conversationToDelete))
 
-        // Ako je obrisana aktivna konverzacija, očisti je
+        // Ako je obrisana aktivna konverzacija, redirektuj na chat stranicu
         if (activeConversation?.id === conversationToDelete) {
-          setActiveConversation(null)
-          // Učitaj prvu preostalu konverzaciju ako postoji
-          const remaining = conversations.filter(c => c.id !== conversationToDelete)
-          if (remaining.length > 0) {
-            loadConversation(remaining[0].id)
-          }
+          router.push('/chat')
         }
       }
     } catch (error) {
@@ -219,7 +211,13 @@ export default function ChatPage() {
     <div className="flex h-[calc(100vh-120px)] bg-white rounded-lg shadow-md overflow-hidden">
       {/* Sidebar */}
       <div className="w-80 border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-gray-200 space-y-2">
+          <Link href="/dashboard">
+            <Button variant="outline" fullWidth size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Nazad na Dashboard
+            </Button>
+          </Link>
           <Button onClick={createNewConversation} fullWidth size="sm">
             <Plus className="h-4 w-4 mr-2" />
             Nova konverzacija
@@ -235,23 +233,24 @@ export default function ChatPage() {
             <div className="p-2 space-y-1">
               {conversations.map((conv) => (
                 <div key={conv.id} className="relative group">
-                  <button
-                    onClick={() => loadConversation(conv.id)}
-                    className={`
-                      w-full text-left p-3 rounded-lg transition-colors
-                      ${activeConversation?.id === conv.id
-                        ? 'bg-blue-50 border border-blue-200'
-                        : 'hover:bg-gray-50 border border-transparent'
-                      }
-                    `}
-                  >
-                    <p className="font-medium text-sm text-gray-900 truncate pr-8">
-                      {conv.title}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {conv.messageCount} poruka
-                    </p>
-                  </button>
+                  <Link href={`/chat/${conv.id}`}>
+                    <button
+                      className={`
+                        w-full text-left p-3 rounded-lg transition-colors
+                        ${activeConversation?.id === conv.id
+                          ? 'bg-blue-50 border border-blue-200'
+                          : 'hover:bg-gray-50 border border-transparent'
+                        }
+                      `}
+                    >
+                      <p className="font-medium text-sm text-gray-900 truncate pr-8">
+                        {conv.title}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {conv.messageCount} poruka
+                      </p>
+                    </button>
+                  </Link>
                   <button
                     onClick={(e) => handleDeleteClick(conv.id, e)}
                     className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded"
@@ -283,8 +282,6 @@ export default function ChatPage() {
                 </div>
               ) : (
                 <>
-                  {/* FIX #2: .filter(Boolean) uklanja sve undefined/null vrednosti
-                      iz niza pre renderovanja, što sprečava crash na message.id */}
                   {activeConversation.messages.filter(Boolean).map((message) => (
                     <ChatMessage
                       key={message.id}
@@ -308,12 +305,14 @@ export default function ChatPage() {
           <div className="flex flex-col items-center justify-center h-full">
             <MessageSquare className="h-16 w-16 text-gray-400 mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              Izaberite ili kreirajte konverzaciju
+              Konverzacija nije pronađena
             </h3>
-            <Button onClick={createNewConversation}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nova konverzacija
-            </Button>
+            <Link href="/chat">
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova konverzacija
+              </Button>
+            </Link>
           </div>
         )}
       </div>
