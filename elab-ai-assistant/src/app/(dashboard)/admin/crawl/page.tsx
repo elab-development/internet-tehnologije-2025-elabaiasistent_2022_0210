@@ -7,7 +7,8 @@ import Card, { CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Spinner from '@/components/ui/Spinner'
-import { Play, CheckCircle, AlertCircle, Clock, Database } from 'lucide-react'
+import DangerConfirmDialog from '@/components/ui/DangerConfirmDialog'
+import { Play, CheckCircle, AlertCircle, Clock, Database, Trash2 } from 'lucide-react'
 
 interface Source {
   id: string
@@ -35,11 +36,15 @@ export default function CrawlJobsPage() {
   const [selectedSources, setSelectedSources] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCrawling, setIsCrawling] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
+  const [resetDialogOpen, setResetDialogOpen] = useState(false)
+  const [resetStats, setResetStats] = useState<any>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
   useEffect(() => {
     fetchData()
+    fetchResetStats()
   }, [])
 
   const fetchData = async () => {
@@ -59,6 +64,16 @@ export default function CrawlJobsPage() {
       setError('Greška pri učitavanju podataka')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchResetStats = async () => {
+    try {
+      const response = await fetch('/api/admin/crawl/reset')
+      const data = await response.json()
+      setResetStats(data.stats)
+    } catch (error) {
+      console.error('Error fetching reset stats:', error)
     }
   }
 
@@ -107,6 +122,41 @@ export default function CrawlJobsPage() {
         ? prev.filter(id => id !== sourceId)
         : [...prev, sourceId]
     )
+  }
+
+  const handleResetClick = () => {
+    setResetDialogOpen(true)
+  }
+
+  const handleResetConfirm = async () => {
+    setIsResetting(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/admin/crawl/reset', {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Greška pri resetovanju podataka')
+      }
+
+      setSuccess('Svi crawlovani podaci su uspešno obrisani!')
+
+      // Refresh data
+      setTimeout(() => {
+        fetchData()
+        fetchResetStats()
+        setSuccess('')
+      }, 2000)
+    } catch (err: any) {
+      setError(err.message)
+      setTimeout(() => setError(''), 3000)
+    } finally {
+      setIsResetting(false)
+    }
   }
 
   const formatDate = (date: string | null) => {
@@ -170,6 +220,77 @@ export default function CrawlJobsPage() {
           <p className="text-sm text-red-800">{error}</p>
         </div>
       )}
+
+      {/* Reset Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-red-600">Opasna zona</CardTitle>
+              <p className="text-sm text-gray-600 mt-1">
+                Resetovanje svih crawlovanih podataka
+              </p>
+            </div>
+            <Database className="h-8 w-8 text-red-400" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <div className="flex items-start">
+              <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-red-900 mb-2">
+                  UPOZORENJE: Ova akcija će trajno obrisati sve podatke!
+                </p>
+                <ul className="text-sm text-red-800 list-disc list-inside space-y-1">
+                  <li>Svi dokumenti iz ChromaDB vektorske baze</li>
+                  <li>Kompletna istorija crawl job-ova</li>
+                  <li>Resetovaće se datum poslednjeg crawlovanja za sve izvore</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {resetStats && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <p className="text-xs text-gray-600">ChromaDB dokumenti</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {resetStats.chromaDocuments || 0}
+                </p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <p className="text-xs text-gray-600">Crawl Job-ova</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {resetStats.crawlJobs || 0}
+                </p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <p className="text-xs text-gray-600">Ukupno izvora</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {resetStats.totalSources || 0}
+                </p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <p className="text-xs text-gray-600">Aktivni izvori</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {resetStats.activeSources || 0}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <Button
+            variant="danger"
+            onClick={handleResetClick}
+            disabled={isResetting}
+            isLoading={isResetting}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Reset svih podataka
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Start Crawl Section */}
       <Card>
@@ -300,6 +421,24 @@ export default function CrawlJobsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Reset Confirmation Dialog */}
+      <DangerConfirmDialog
+        isOpen={resetDialogOpen}
+        onClose={() => setResetDialogOpen(false)}
+        onConfirm={handleResetConfirm}
+        title="Resetuj sve crawlovane podatke"
+        message="Ova akcija će TRAJNO obrisati sve indeksirane dokumente i istoriju crawl job-ova. Ova akcija se NE MOŽE poništiti!"
+        confirmationText="RESET"
+        confirmButtonText="Obriši sve podatke"
+        cancelButtonText="Otkaži"
+        stats={resetStats ? [
+          { label: 'ChromaDB dokumenti', value: resetStats.chromaDocuments || 0 },
+          { label: 'Crawl job-ova', value: resetStats.crawlJobs || 0 },
+          { label: 'Izvori (resetovani)', value: resetStats.totalSources || 0 },
+          { label: 'Kolekcija', value: resetStats.collectionName || 'N/A' },
+        ] : []}
+      />
     </div>
   )
 }
