@@ -3,7 +3,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// 🔹 KLJUČNO: Spreči statički rendering
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
@@ -11,25 +10,47 @@ export async function GET(req: NextRequest) {
   try {
     const token = req.nextUrl.searchParams.get('token')
 
+    // ✅ Koristi APP_URL iz env
+    const APP_URL = process.env.APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'
+
+    console.log('🔵 [VERIFY] Token:', token)
+    console.log('🔵 [VERIFY] APP_URL:', APP_URL)
+
     if (!token) {
-      return NextResponse.redirect(new URL('/login?error=missing_token', req.url))
+      console.log('🔵 [VERIFY] Missing token, redirecting...')
+      return new NextResponse(
+        `<!DOCTYPE html>
+        <html>
+          <head>
+            <meta http-equiv="refresh" content="0; url=${APP_URL}/login?error=missing_token">
+          </head>
+          <body><p>Redirecting...</p></body>
+        </html>`,
+        { status: 200, headers: { 'Content-Type': 'text/html' } }
+      )
     }
 
-    // Pronađi korisnika sa tokenom
     const user = await prisma.user.findFirst({
       where: {
         verificationToken: token,
-        tokenExpiresAt: {
-          gte: new Date(), // Token nije istekao
-        },
+        tokenExpiresAt: { gte: new Date() },
       },
     })
 
     if (!user) {
-      return NextResponse.redirect(new URL('/login?error=invalid_token', req.url))
+      console.log('🔵 [VERIFY] Invalid token, redirecting...')
+      return new NextResponse(
+        `<!DOCTYPE html>
+        <html>
+          <head>
+            <meta http-equiv="refresh" content="0; url=${APP_URL}/login?error=invalid_token">
+          </head>
+          <body><p>Invalid token. Redirecting...</p></body>
+        </html>`,
+        { status: 200, headers: { 'Content-Type': 'text/html' } }
+      )
     }
 
-    // Verifikuj korisnika
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -40,7 +61,6 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    // Audit log
     await prisma.auditLog.create({
       data: {
         userId: user.id,
@@ -52,11 +72,37 @@ export async function GET(req: NextRequest) {
     })
 
     console.log('✅ Email verified for user:', user.email)
+    console.log('🔵 [VERIFY] Redirecting to:', `${APP_URL}/login?verified=true`)
 
-    // Redirect na login sa success porukom
-    return NextResponse.redirect(new URL('/login?verified=true', req.url))
+    return new NextResponse(
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <meta http-equiv="refresh" content="0; url=${APP_URL}/login?verified=true">
+          <title>Verification Successful</title>
+        </head>
+        <body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f3f4f6;">
+          <div style="text-align: center;">
+            <h1 style="color: #10b981; font-size: 48px; margin: 0;">✅</h1>
+            <h2 style="color: #111827; margin: 16px 0;">Email verifikovan!</h2>
+            <p style="color: #6b7280;">Redirectujemo vas na login stranicu...</p>
+          </div>
+        </body>
+      </html>`,
+      { status: 200, headers: { 'Content-Type': 'text/html' } }
+    )
   } catch (error) {
-    console.error('Verification error:', error)
-    return NextResponse.redirect(new URL('/login?error=verification_failed', req.url))
+    console.error('❌ Verification error:', error)
+    const APP_URL = process.env.APP_URL || 'http://localhost:3000'
+    return new NextResponse(
+      `<!DOCTYPE html>
+      <html>
+        <head>
+          <meta http-equiv="refresh" content="0; url=${APP_URL}/login?error=verification_failed">
+        </head>
+        <body><p>Error. Redirecting...</p></body>
+      </html>`,
+      { status: 200, headers: { 'Content-Type': 'text/html' } }
+    )
   }
 }
