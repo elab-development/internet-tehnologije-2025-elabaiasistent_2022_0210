@@ -1,5 +1,7 @@
 // src/app/api/weather/route.ts
 
+export const dynamic = 'force-dynamic'
+
 import { NextRequest } from 'next/server'
 import { getWeatherAPI } from '@/lib/weather-api'
 import { errorResponse, successResponse } from '@/lib/api-response'
