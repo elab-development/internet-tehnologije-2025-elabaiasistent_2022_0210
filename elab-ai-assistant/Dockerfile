@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Instaliraj SVE dependencies (uključujući devDependencies)
-RUN npm ci
+RUN npm install
 
 # ============================================
 # STAGE 2: Builder
