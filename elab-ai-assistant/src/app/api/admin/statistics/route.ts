@@ -71,11 +71,11 @@ export async function GET(req: NextRequest) {
         pendingFlags,
         openTickets,
       },
-      usersByRole: usersByRole.map(item => ({
+      usersByRole: (usersByRole as any[]).map(item => ({
         role: item.role,
         count: item._count,
       })),
-      messagesByDay: messagesByDay.map(item => ({
+      messagesByDay: (messagesByDay as any[]).map(item => ({
         date: item.createdAt,
         count: item._count,
       })),
