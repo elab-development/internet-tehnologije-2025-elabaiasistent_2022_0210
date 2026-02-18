@@ -75,7 +75,7 @@ async function crawlDocuments(sources: any[], crawlJobId: string) {
     const crawler = new WebCrawler({
       maxDepth: 2,
       maxPages: 50,
-      timeout: 10000,
+      timeout: 30000,
     })
 
     const chunker = new TextChunker({

@@ -56,9 +56,13 @@ export class OllamaClient {
    */
   async healthCheck(): Promise<boolean> {
     try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 10_000) // 10s za health check
       const response = await fetch(`${this.baseUrl}/api/tags`, {
         method: 'GET',
+        signal: controller.signal,
       })
+      clearTimeout(timeout)
       return response.ok
     } catch {
       return false
@@ -134,6 +138,9 @@ export class OllamaClient {
   ): Promise<string> {
     const { temperature = 0.7, maxTokens = 1000 } = options
 
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 240_000) // 4 minuta (ispod maxDuration od 5min)
+
     try {
       const response = await fetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',
@@ -147,7 +154,10 @@ export class OllamaClient {
             num_predict: maxTokens,
           },
         }),
+        signal: controller.signal,
       })
+
+      clearTimeout(timeout)
 
       if (!response.ok) {
         throw new Error(`Ollama API error: ${response.statusText}`)
@@ -156,6 +166,7 @@ export class OllamaClient {
       const data = await response.json()
       return data.message?.content || ''
     } catch (error) {
+      clearTimeout(timeout)
       console.error('❌ Ollama chat error:', error)
       throw error
     }

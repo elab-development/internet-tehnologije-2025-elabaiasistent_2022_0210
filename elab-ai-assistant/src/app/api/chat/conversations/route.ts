@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     })
 
     return successResponse({
-      conversations: conversations.map(conv => ({
+      conversations: (conversations as any[]).map(conv => ({
         id: conv.id,
         title: conv.title,
         createdAt: conv.createdAt,

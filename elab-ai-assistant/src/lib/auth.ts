@@ -11,7 +11,7 @@ import { createLoginLimiter } from './rate-limit'
 const loginLimiter = createLoginLimiter()
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter: PrismaAdapter(prisma as any),
   providers: [
     CredentialsProvider({
       name: 'Credentials',

@@ -148,6 +148,9 @@ export class OllamaEmbedding {
    * Generiše embedding koristeći Ollama API
    */
   async embed(text: string): Promise<number[]> {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 55_000) // 55s - ispod 60s Vercel limita
+
     try {
       const response = await fetch(`${this.baseUrl}/api/embeddings`, {
         method: 'POST',
@@ -156,7 +159,9 @@ export class OllamaEmbedding {
           model: this.model,
           prompt: text,
         }),
+        signal: controller.signal,
       })
+      clearTimeout(timeout)
 
       if (!response.ok) {
         throw new Error(`Ollama API error: ${response.statusText}`)
@@ -165,6 +170,7 @@ export class OllamaEmbedding {
       const data = await response.json()
       return data.embedding
     } catch (error) {
+      clearTimeout(timeout)
       console.error('❌ Ollama embedding error:', error)
       throw error
     }

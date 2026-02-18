@@ -249,3 +249,7 @@ export async function getVectorDB(): Promise<VectorDB> {
   }
   return vectorDBInstance
 }
+
+export function resetVectorDBInstance(): void {
+  vectorDBInstance = null
+}

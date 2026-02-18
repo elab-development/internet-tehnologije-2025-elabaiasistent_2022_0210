@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const message = await prisma.message.findUnique({
       where: { id: validatedData.messageId },
       include: { conversation: true },
-    })
+    }) as any
 
     if (!message) {
       throw new ApiError('Poruka nije pronađena', 404)

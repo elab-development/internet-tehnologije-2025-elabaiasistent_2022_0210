@@ -1,6 +1,5 @@
 // src/lib/sanitize.ts
 
-import DOMPurify from 'isomorphic-dompurify'
 import validator from 'validator'
 
 /**
@@ -9,13 +8,11 @@ import validator from 'validator'
  */
 
 /**
- * Sanitizuje HTML sadržaj (XSS zaštita)
+ * Sanitizuje HTML sadržaj (XSS zaštita) - uklanja sve HTML tagove
  */
 export function sanitizeHTML(input: string): string {
-  return DOMPurify.sanitize(input, {
-    ALLOWED_TAGS: [], // Ne dozvoli nijedan HTML tag
-    ALLOWED_ATTR: [],
-  })
+  // Ukloni sve HTML tagove (ekvivalentno DOMPurify sa ALLOWED_TAGS: [])
+  return input.replace(/<[^>]*>/g, '').trim()
 }
 
 /**

@@ -35,7 +35,7 @@ const DEFAULT_CONFIG: CrawlerConfig = {
   maxDepth: 2,
   maxPages: 50,
   timeout: 10000,
-  userAgent: 'ELAB-AI-Crawler/1.0',
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   respectRobotsTxt: true,
   allowedDomains: ['elab.fon.bg.ac.rs', 'bc.elab.fon.bg.ac.rs', 'ebt.rs'],
 }

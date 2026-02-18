@@ -3,7 +3,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth-helpers'
-import { getVectorDB } from '@/lib/vector-db'
+import { getVectorDB, resetVectorDBInstance } from '@/lib/vector-db'
 import { errorResponse, successResponse, ApiError } from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
@@ -32,6 +32,7 @@ export async function DELETE(req: NextRequest) {
     // 2. Obriši ChromaDB kolekciju (kompletno)
     console.log(`🗑️  Deleting ChromaDB collection...`)
     await vectorDB.clear()
+    resetVectorDBInstance() // Invalidate singleton so next request re-initializes
 
     // 3. Obriši sve crawl job zapise iz baze
     console.log(`🗑️  Deleting all CrawlJob records...`)

@@ -12,7 +12,7 @@ const nextConfig = {
     },
     // 🔹 Dodaj eksterne pakete koji se ne bundluju
     serverComponentsExternalPackages: [
-      '@prisma/client', 
+      '@prisma/client',
       'prisma',
       'chromadb',
       '@xenova/transformers',

@@ -1,5 +1,7 @@
 // src/app/api/chat/messages/route.ts
 
+export const maxDuration = 300 // 5 minuta - potrebno za Modal.com cold start
+
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-helpers'
@@ -41,7 +43,7 @@ export async function POST(req: NextRequest) {
           take: 10, // Poslednje 10 poruka za kontekst
         },
       },
-    })
+    }) as any
 
     if (!conversation) {
       throw new ApiError('Konverzacija nije pronađena', 404)
@@ -82,7 +84,7 @@ export async function POST(req: NextRequest) {
     }))
 
     // 4. Pripremi istoriju konverzacije
-    const conversationHistory = conversation.messages.map(msg => ({
+    const conversationHistory = conversation.messages.map((msg: { role: string; content: string }) => ({
       role: msg.role === 'USER' ? ('user' as const) : ('assistant' as const),
       content: msg.content,
     }))

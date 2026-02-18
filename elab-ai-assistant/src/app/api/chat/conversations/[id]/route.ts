@@ -37,7 +37,7 @@ export async function GET(
           },
         },
       },
-    })
+    }) as any
 
     if (!conversation) {
       throw new ApiError('Konverzacija nije pronađena', 404)
