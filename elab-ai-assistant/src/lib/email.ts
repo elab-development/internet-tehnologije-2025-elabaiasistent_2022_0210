@@ -2,8 +2,10 @@
 
 import { Resend } from 'resend'
 
-// Inicijalizuj Resend klijenta
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Lazy inicijalizacija - ne kreira klijenta pri module load (sprečava build error)
+function getResend(): Resend {
+  return new Resend(process.env.RESEND_API_KEY || 're_missing_key')
+}
 
 const FROM_EMAIL = process.env.EMAIL_FROM || 'ELAB AI Assistant <onboarding@resend.dev>'
 const APP_URL = process.env.APP_URL || 'http://localhost:3000'
@@ -237,7 +239,7 @@ export async function sendVerificationEmail(
     console.log('   SUBJECT: ✅ Verifikujte vaš ELAB AI nalog')
 
     console.log('🚀 Calling Resend API...')
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to: actualRecipient,
       subject: '✅ Verifikujte vaš ELAB AI nalog',
