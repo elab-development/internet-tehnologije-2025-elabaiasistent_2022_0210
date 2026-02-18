@@ -57,6 +57,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        BUILD_STANDALONE: "true"
     container_name: elab-app
     restart: unless-stopped
     ports:

@@ -2,9 +2,9 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Note: 'standalone' output is for Docker. Vercel handles this automatically.
-  // Uncomment the line below if deploying with Docker instead of Vercel:
-  // output: 'standalone',
+  // 'standalone' output needed for Docker, not for Vercel.
+  // Set BUILD_STANDALONE=true in Docker environment to enable.
+  ...(process.env.BUILD_STANDALONE === 'true' && { output: 'standalone' }),
 
   experimental: {
     serverActions: {

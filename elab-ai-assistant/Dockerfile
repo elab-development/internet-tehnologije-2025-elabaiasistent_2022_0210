@@ -30,14 +30,17 @@ ARG DATABASE_URL
 ARG NEXTAUTH_SECRET
 ARG NEXTAUTH_URL
 ARG NEXT_PUBLIC_APP_URL
+ARG BUILD_STANDALONE=true
 
 # 🔹 SETOVANJE ENV VARIJABLI za build proces
 # Ove će biti dostupne tokom `npm run build`
 ENV RESEND_API_KEY=${RESEND_API_KEY:-re_GBKSrAmr_MKXTXNj5r7oZQ6PYCSE7qWQh}
 ENV DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/elab_ai}
+ENV PRISMA_DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/elab_ai}
 ENV NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-dummy-secret-minimum-32-characters-long}
 ENV NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+ENV BUILD_STANDALONE=${BUILD_STANDALONE}
 
 # Generiši Prisma Client
 RUN npx prisma generate
