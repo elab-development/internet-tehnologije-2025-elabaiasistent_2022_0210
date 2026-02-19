@@ -66,6 +66,7 @@ services:
     environment:
       # Database
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/elab_ai
+      PRISMA_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/elab_ai
       
       # NextAuth
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-your-super-secret-key-change-this-in-production}
